@@ -1,5 +1,8 @@
 #pragma once
 
+#include "HalationEngine.h"
+#include "PresetManager.h"
+#include "ParameterIDs.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #if (MSVC)
@@ -38,6 +41,15 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState& getAPVTS() { return m_apvts; }
+    PresetManager&                      getPresetManager() { return m_presetManager; }
+
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
 private:
+    juce::AudioProcessorValueTreeState m_apvts;
+    halation::HalationEngine           m_engine;
+    PresetManager                      m_presetManager;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

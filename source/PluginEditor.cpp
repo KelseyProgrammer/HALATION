@@ -1,48 +1,77 @@
 #include "PluginEditor.h"
+#include "HalationLookAndFeel.h"
 
 PluginEditor::PluginEditor (PluginProcessor& p)
-    : AudioProcessorEditor (&p), processorRef (p)
+    : AudioProcessorEditor (&p), m_processorRef (p)
 {
-    juce::ignoreUnused (processorRef);
+    setLookAndFeel (&m_lookAndFeel);
 
-    addAndMakeVisible (inspectButton);
-
-    // this chunk of code instantiates and opens the melatonin inspector
-    inspectButton.onClick = [&] {
-        if (!inspector)
+    addAndMakeVisible (m_inspectButton);
+    m_inspectButton.onClick = [&]
+    {
+        if (! m_inspector)
         {
-            inspector = std::make_unique<melatonin::Inspector> (*this);
-            inspector->onClose = [this]() { inspector.reset(); };
+            m_inspector = std::make_unique<melatonin::Inspector> (*this);
+            m_inspector->onClose = [this]() { m_inspector.reset(); };
         }
-
-        inspector->setVisible (true);
+        m_inspector->setVisible (true);
     };
 
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize (400, 300);
+    setSize (680, 480);
+    setResizable (false, false);
 }
 
 PluginEditor::~PluginEditor()
 {
+    setLookAndFeel (nullptr);
 }
 
 void PluginEditor::paint (juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    g.fillAll (HalationLookAndFeel::background());
 
-    auto area = getLocalBounds();
-    g.setColour (juce::Colours::white);
-    g.setFont (16.0f);
-    auto helloWorld = juce::String ("Hello from ") + PRODUCT_NAME_WITHOUT_VERSION + " v" VERSION + " running in " + CMAKE_BUILD_TYPE;
-    g.drawText (helloWorld, area.removeFromTop (150), juce::Justification::centred, false);
+    // Plugin name header
+    g.setColour (HalationLookAndFeel::accentAmber());
+    g.setFont (juce::Font (juce::FontOptions{}
+                               .withName (juce::Font::getDefaultMonospacedFontName())
+                               .withHeight (20.0f)
+                               .withStyle ("Bold")));
+    g.drawText ("HALATION", 20, 16, 200, 28, juce::Justification::centredLeft, false);
+
+    // Subtitle
+    g.setColour (HalationLookAndFeel::mutedLabel());
+    g.setFont (juce::Font (juce::FontOptions{}
+                               .withName (juce::Font::getDefaultMonospacedFontName())
+                               .withHeight (9.0f)));
+    g.drawText ("FEEDBACK PITCH ECOSYSTEM", 20, 44, 260, 14,
+                juce::Justification::centredLeft, false);
+
+    // Company name (top-right)
+    g.setColour (HalationLookAndFeel::mutedLabel());
+    g.setFont (juce::Font (juce::FontOptions{}
+                               .withName (juce::Font::getDefaultMonospacedFontName())
+                               .withHeight (9.0f)));
+    g.drawText ("AMENT AUDIO", getWidth() - 120, 16, 100, 14,
+                juce::Justification::centredRight, false);
+    g.drawText ("v" + juce::String (VERSION), getWidth() - 120, 32, 100, 14,
+                juce::Justification::centredRight, false);
+
+    // Placeholder panel outlines (will be replaced in Phase 5 UI)
+    g.setColour (HalationLookAndFeel::sectionBorder());
+    // Left panel (path matrix)
+    g.drawRect (12, 70, 240, 370, 1);
+    // Centre panel (bloom visualizer)
+    g.drawRect (260, 70, 280, 370, 1);
+    // Right panel (global knobs)
+    g.drawRect (548, 70, 120, 370, 1);
+
+    // Centre placeholder text
+    g.setColour (HalationLookAndFeel::mutedLabel());
+    g.setFont (9.0f);
+    g.drawText ("BLOOM VISUALIZER", 260, 248, 280, 14, juce::Justification::centred, false);
 }
 
 void PluginEditor::resized()
 {
-    // layout the positions of your child components here
-    auto area = getLocalBounds();
-    area.removeFromBottom(50);
-    inspectButton.setBounds (getLocalBounds().withSizeKeepingCentre(100, 50));
+    m_inspectButton.setBounds (getWidth() - 70, getHeight() - 30, 60, 20);
 }

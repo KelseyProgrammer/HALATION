@@ -1,16 +1,19 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "ParameterIDs.h"
+#include "IntervalPresets.h"
 
-//==============================================================================
 PluginProcessor::PluginProcessor()
-     : AudioProcessor (BusesProperties()
+    : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                      ),
+      m_apvts (*this, nullptr, "HALATION", createParameterLayout()),
+      m_presetManager (m_apvts)
 {
 }
 
@@ -19,10 +22,71 @@ PluginProcessor::~PluginProcessor()
 }
 
 //==============================================================================
-const juce::String PluginProcessor::getName() const
+juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
-    return JucePlugin_Name;
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+
+    // Global parameters
+    layout.add (std::make_unique<juce::AudioParameterInt>  (ParameterIDs::globalNumPaths,
+                                                             "Paths", 2, 8, 4));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalBloomRate,
+                                                             "Bloom",
+                                                             juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                             0.3f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalStagger,
+                                                             "Stagger",
+                                                             juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                             0.5f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalSpectralTilt,
+                                                             "Tilt",
+                                                             juce::NormalisableRange<float> (-1.0f, 1.0f),
+                                                             -0.2f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalDamping,
+                                                             "Damping",
+                                                             juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                             0.4f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalChaos,
+                                                             "Chaos",
+                                                             juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                             0.15f));
+    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalMix,
+                                                             "Mix",
+                                                             juce::NormalisableRange<float> (0.0f, 1.0f),
+                                                             0.7f));
+    layout.add (std::make_unique<juce::AudioParameterInt>  (ParameterIDs::globalIntervalPreset,
+                                                             "Preset", 0, 5, 2));
+
+    // Per-path parameters
+    auto fifthsDefaults = halation::IntervalPresets::getPreset (halation::PresetID::Fifths);
+
+    for (int i = 0; i < 8; ++i)
+    {
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            ParameterIDs::pathSemitones (i),
+            "Path " + juce::String (i + 1) + " Semi",
+            juce::NormalisableRange<float> (-24.0f, 24.0f),
+            fifthsDefaults[static_cast<size_t> (i)]));
+
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            ParameterIDs::pathLevel (i),
+            "Path " + juce::String (i + 1) + " Level",
+            juce::NormalisableRange<float> (0.0f, 1.0f),
+            1.0f));
+
+        // Default pan: spread evenly from -0.875 to +0.875
+        float defaultPan = -0.875f + static_cast<float> (i) * 0.25f;
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            ParameterIDs::pathPan (i),
+            "Path " + juce::String (i + 1) + " Pan",
+            juce::NormalisableRange<float> (-1.0f, 1.0f),
+            defaultPan));
+    }
+
+    return layout;
 }
+
+//==============================================================================
+const juce::String PluginProcessor::getName() const { return JucePlugin_Name; }
 
 bool PluginProcessor::acceptsMidi() const
 {
@@ -53,48 +117,32 @@ bool PluginProcessor::isMidiEffect() const
 
 double PluginProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    // Maximum delay time: kBaseDelayMs + kMaxStaggerMs * 7 paths = 20 + 560 = 580ms
+    // Add phase vocoder latency (~46ms). Round up generously.
+    return 1.0;
 }
 
-int PluginProcessor::getNumPrograms()
+int PluginProcessor::getNumPrograms()         { return 1; }
+int PluginProcessor::getCurrentProgram()      { return 0; }
+void PluginProcessor::setCurrentProgram (int) {}
+
+const juce::String PluginProcessor::getProgramName (int)
 {
-    return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
+    return m_presetManager.getCurrentPresetName();
 }
 
-int PluginProcessor::getCurrentProgram()
-{
-    return 0;
-}
-
-void PluginProcessor::setCurrentProgram (int index)
-{
-    juce::ignoreUnused (index);
-}
-
-const juce::String PluginProcessor::getProgramName (int index)
-{
-    juce::ignoreUnused (index);
-    return {};
-}
-
-void PluginProcessor::changeProgramName (int index, const juce::String& newName)
-{
-    juce::ignoreUnused (index, newName);
-}
+void PluginProcessor::changeProgramName (int, const juce::String&) {}
 
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    m_engine.prepare (sampleRate, samplesPerBlock);
+    setLatencySamples (m_engine.getLatencySamples());
 }
 
 void PluginProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
+    m_engine.reset();
 }
 
 bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -103,15 +151,11 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     juce::ignoreUnused (layouts);
     return true;
   #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
-    // This checks if the input layout matches the output layout
    #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+    if (layouts.getMainInputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
    #endif
 
@@ -120,42 +164,35 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 }
 
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-                                              juce::MidiBuffer& midiMessages)
+                                    juce::MidiBuffer& midiMessages)
 {
     juce::ignoreUnused (midiMessages);
-
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    // Pull parameter values and forward to engine (message-thread values, safe to read atomically)
+    const float bloomRate    = *m_apvts.getRawParameterValue (ParameterIDs::globalBloomRate);
+    const float stagger      = *m_apvts.getRawParameterValue (ParameterIDs::globalStagger);
+    const float spectralTilt = *m_apvts.getRawParameterValue (ParameterIDs::globalSpectralTilt);
+    const float damping      = *m_apvts.getRawParameterValue (ParameterIDs::globalDamping);
+    const float chaos        = *m_apvts.getRawParameterValue (ParameterIDs::globalChaos);
+    const float mix          = *m_apvts.getRawParameterValue (ParameterIDs::globalMix);
+    const int   numPaths     = static_cast<int> (*m_apvts.getRawParameterValue (ParameterIDs::globalNumPaths));
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    m_engine.setGlobalParameters (bloomRate, stagger, spectralTilt, damping, chaos, mix);
+    m_engine.setNumPaths (numPaths);
+
+    for (int i = 0; i < 8; ++i)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
+        m_engine.setPathInterval (i, *m_apvts.getRawParameterValue (ParameterIDs::pathSemitones (i)));
+        m_engine.setPathLevel    (i, *m_apvts.getRawParameterValue (ParameterIDs::pathLevel (i)));
+        m_engine.setPathPan      (i, *m_apvts.getRawParameterValue (ParameterIDs::pathPan (i)));
     }
+
+    m_engine.process (buffer);
 }
 
 //==============================================================================
-bool PluginProcessor::hasEditor() const
-{
-    return true; // (change this to false if you choose to not supply an editor)
-}
+bool PluginProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
@@ -165,21 +202,22 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 //==============================================================================
 void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused (destData);
+    auto state = m_apvts.copyState();
+    if (auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused (data, sizeInBytes);
+    if (auto xml = getXmlFromBinary (data, sizeInBytes))
+    {
+        auto state = juce::ValueTree::fromXml (*xml);
+        if (state.isValid())
+            m_apvts.replaceState (state);
+    }
 }
 
 //==============================================================================
-// This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new PluginProcessor();
