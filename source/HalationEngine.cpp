@@ -13,7 +13,6 @@ HalationEngine::HalationEngine()
         m_paths[idx].setSemitones (fifths[idx]);
         m_paths[idx].setLevel (1.0f);
 
-        // Spread pans evenly from -0.875 to +0.875
         float pan = -0.875f + static_cast<float> (i) * 0.25f;
         m_paths[idx].setPan (pan);
     }
@@ -22,8 +21,24 @@ HalationEngine::HalationEngine()
 void HalationEngine::prepare (double sampleRate, int maxBlockSize)
 {
     m_sampleRate = sampleRate;
+
     for (auto& path : m_paths)
         path.prepare (sampleRate, maxBlockSize);
+
+    m_bloomSmoothed.reset (sampleRate, 0.02);
+    m_bloomSmoothed.setCurrentAndTargetValue (0.3f);
+
+    m_mixSmoothed.reset (sampleRate, 0.02);
+    m_mixSmoothed.setCurrentAndTargetValue (0.7f);
+
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate       = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (maxBlockSize);
+    spec.numChannels      = 2;
+    m_limiter.prepare (spec);
+    m_limiter.setThreshold (-1.0f);
+    m_limiter.setRelease (200.0f);
+
     updateStaggerDelays();
 }
 
@@ -31,6 +46,8 @@ void HalationEngine::reset()
 {
     for (auto& path : m_paths)
         path.reset();
+
+    m_limiter.reset();
 }
 
 void HalationEngine::process (juce::AudioBuffer<float>& buffer)
@@ -42,9 +59,7 @@ void HalationEngine::process (juce::AudioBuffer<float>& buffer)
     auto* dataL = buffer.getWritePointer (0);
     auto* dataR = buffer.getWritePointer (1);
 
-    const float dryGain = 1.0f - m_mix;
-    const float wetGain = m_mix;
-
+    // Chaos LFO rate: per-path phase offset, Hz range 0.1–0.5
     const float chaosRate = juce::MathConstants<float>::twoPi * 0.3f
                             / static_cast<float> (m_sampleRate);
 
@@ -52,6 +67,10 @@ void HalationEngine::process (juce::AudioBuffer<float>& buffer)
     {
         const float dryL = dataL[s];
         const float dryR = dataR[s];
+
+        // Advance smoothed parameters one sample
+        const float bloom = m_bloomSmoothed.getNextValue();
+        const float mix   = m_mixSmoothed.getNextValue();
 
         float wetL = 0.0f;
         float wetR = 0.0f;
@@ -64,25 +83,34 @@ void HalationEngine::process (juce::AudioBuffer<float>& buffer)
             {
                 const auto idx = static_cast<size_t> (i);
 
-                float chaosCents = std::sin (m_chaosLfoPhase[idx]) * m_chaos * 15.0f;
-                m_chaosLfoPhase[idx] += chaosRate * (1.0f + static_cast<float> (i) * 0.17f);
+                // Advance chaos LFO and push offset to path
+                float chaosCents = std::sin (m_chaosLfoPhase[idx])
+                                   * m_chaos * 15.0f;
+                m_chaosLfoPhase[idx] += chaosRate
+                                        * (1.0f + static_cast<float> (i) * 0.17f);
                 if (m_chaosLfoPhase[idx] > juce::MathConstants<float>::twoPi)
                     m_chaosLfoPhase[idx] -= juce::MathConstants<float>::twoPi;
 
-                juce::ignoreUnused (chaosCents); // applied in Phase 2 per-path pitch offset
+                m_paths[idx].setChaosOffsetCents (chaosCents);
 
                 auto [pathWetL, pathWetR] = m_paths[idx].process (dryL, dryR,
-                                                                    m_bloomRate,
+                                                                    bloom,
                                                                     m_staggerDelaySamples[idx]);
                 wetL += pathWetL;
                 wetR += pathWetR;
             }
         }
 
-        const float norm = (m_numPaths > 0) ? (1.0f / static_cast<float> (m_numPaths)) : 1.0f;
-        dataL[s] = dryL * dryGain + wetL * wetGain * norm;
-        dataR[s] = dryR * dryGain + wetR * wetGain * norm;
+        const float norm  = (m_numPaths > 0)
+                            ? (1.0f / static_cast<float> (m_numPaths)) : 1.0f;
+        dataL[s] = dryL * (1.0f - mix) + wetL * mix * norm;
+        dataR[s] = dryR * (1.0f - mix) + wetR * mix * norm;
     }
+
+    // Output limiter — prevents runaway feedback from clipping
+    juce::dsp::AudioBlock<float>          block  (buffer);
+    juce::dsp::ProcessContextReplacing<float> ctx (block);
+    m_limiter.process (ctx);
 }
 
 void HalationEngine::setNumPaths (int n)
@@ -110,20 +138,21 @@ void HalationEngine::setPathPan (int path, float pan)
         m_paths[static_cast<size_t> (path)].setPan (pan);
 }
 
-void HalationEngine::setGlobalParameters (float bloomRate, float stagger, float spectralTilt,
-                                           float damping, float chaos, float mix)
+void HalationEngine::setGlobalParameters (float bloomRate, float stagger,
+                                           float spectralTilt, float damping,
+                                           float chaos, float mix)
 {
-    m_bloomRate = bloomRate;
-    m_mix       = mix;
-    m_chaos     = chaos;
-    m_stagger   = stagger;
+    m_bloomSmoothed.setTargetValue (bloomRate);
+    m_mixSmoothed.setTargetValue   (mix);
+    m_chaos   = chaos;
+    m_stagger = stagger;
 
     updateStaggerDelays();
 
     for (auto& path : m_paths)
     {
         path.setSpectralTilt (spectralTilt);
-        path.setDamping (damping);
+        path.setDamping      (damping);
     }
 }
 
@@ -138,7 +167,8 @@ void HalationEngine::updateStaggerDelays()
     for (auto i = 0; i < kMaxPaths; ++i)
     {
         const auto idx = static_cast<size_t> (i);
-        float delayMs  = static_cast<float> (i) * m_stagger * PathProcessor::kMaxStaggerMs;
+        float delayMs  = static_cast<float> (i) * m_stagger
+                         * PathProcessor::kMaxStaggerMs;
         m_staggerDelaySamples[idx] = static_cast<int> (delayMs * srMs);
     }
 }

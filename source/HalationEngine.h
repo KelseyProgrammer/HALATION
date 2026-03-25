@@ -3,6 +3,7 @@
 #include "PathProcessor.h"
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
+#include <juce_dsp/juce_dsp.h>
 #include <array>
 
 namespace halation
@@ -22,8 +23,7 @@ public:
     void reset();
     void process (juce::AudioBuffer<float>& buffer);
 
-    // Thread-safe path count change (use a lock on message thread).
-    void setNumPaths    (int n);
+    void setNumPaths     (int n);
     void setPathInterval (int path, float semitones);
     void setPathLevel    (int path, float level);
     void setPathPan      (int path, float pan);
@@ -44,13 +44,18 @@ private:
     std::array<int, kMaxPaths>           m_staggerDelaySamples {};
     std::array<float, kMaxPaths>         m_chaosLfoPhase {};
 
-    int    m_numPaths    { 4 };
-    float  m_bloomRate   { 0.3f };
-    float  m_stagger     { 0.5f };
-    float  m_chaos       { 0.15f };
-    float  m_mix         { 0.7f };
+    int   m_numPaths { 4 };
+    float m_stagger  { 0.5f };
+    float m_chaos    { 0.15f };
 
-    double m_sampleRate  { 44100.0 };
+    // Smoothed parameters (20ms ramp)
+    juce::SmoothedValue<float> m_bloomSmoothed;
+    juce::SmoothedValue<float> m_mixSmoothed;
+
+    // Output safety limiter (-1 dBFS ceiling)
+    juce::dsp::Limiter<float> m_limiter;
+
+    double m_sampleRate { 44100.0 };
 
     juce::CriticalSection m_pathCountLock;
 };
