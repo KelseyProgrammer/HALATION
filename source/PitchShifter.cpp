@@ -110,8 +110,10 @@ void PitchShifter::processFrame()
     // Inverse FFT
     m_fft.perform (outputBins.data(), m_timeDomain.data(), true);
 
-    // Overlap-add with normalisation
-    const float scale = 1.0f / (static_cast<float> (kFFTSize) * 0.5f);
+    // Overlap-add normalisation: JUCE IFFT divides by N, analysis and synthesis
+    // windows are both Hann. OLA sum of Hann² at 75% overlap = 1.5 exactly,
+    // so scale = 2/3 for perfect reconstruction at unity pitch ratio.
+    const float scale = 2.0f / 3.0f;
     for (auto i = 0; i < kFFTSize; ++i)
     {
         const auto dst = static_cast<size_t> ((m_fifoIndex + i) % kFFTSize);
