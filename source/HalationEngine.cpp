@@ -115,8 +115,18 @@ void HalationEngine::process (juce::AudioBuffer<float>& buffer)
 
 void HalationEngine::setNumPaths (int n)
 {
-    juce::ScopedLock lock (m_pathCountLock);
-    m_numPaths = juce::jlimit (kMinPaths, kMaxPaths, n);
+    const int clamped = juce::jlimit (kMinPaths, kMaxPaths, n);
+    {
+        juce::ScopedLock lock (m_pathCountLock);
+        const int prev = m_numPaths;
+        m_numPaths = clamped;
+        // Reset paths that just became inactive to clear stale feedback
+        if (clamped < prev)
+        {
+            for (int i = clamped; i < prev; ++i)
+                m_paths[static_cast<size_t> (i)].reset();
+        }
+    }
     updateStaggerDelays();
 }
 

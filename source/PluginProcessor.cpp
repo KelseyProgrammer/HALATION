@@ -15,10 +15,17 @@ PluginProcessor::PluginProcessor()
       m_apvts (*this, nullptr, "HALATION", createParameterLayout()),
       m_presetManager (m_apvts)
 {
+    // Listen for preset selector and all path semitone changes
+    m_apvts.addParameterListener (ParameterIDs::globalIntervalPreset, this);
+    for (int i = 0; i < 8; ++i)
+        m_apvts.addParameterListener (ParameterIDs::pathSemitones (i), this);
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    m_apvts.removeParameterListener (ParameterIDs::globalIntervalPreset, this);
+    for (int i = 0; i < 8; ++i)
+        m_apvts.removeParameterListener (ParameterIDs::pathSemitones (i), this);
 }
 
 //==============================================================================
@@ -215,6 +222,47 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
         if (state.isValid())
             m_apvts.replaceState (state);
     }
+}
+
+//==============================================================================
+void PluginProcessor::parameterChanged (const juce::String& paramID, float newValue)
+{
+    if (m_ignoreParamChanges)
+        return;
+
+    if (paramID == ParameterIDs::globalIntervalPreset)
+    {
+        auto id = static_cast<halation::PresetID> (static_cast<int> (newValue));
+        if (id != halation::PresetID::Custom)
+            applyIntervalPreset (id);
+    }
+    else
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            if (paramID == ParameterIDs::pathSemitones (i))
+            {
+                m_ignoreParamChanges = true;
+                if (auto* p = m_apvts.getParameter (ParameterIDs::globalIntervalPreset))
+                    p->setValueNotifyingHost (p->convertTo0to1 (
+                        static_cast<float> (halation::PresetID::Custom)));
+                m_ignoreParamChanges = false;
+                break;
+            }
+        }
+    }
+}
+
+void PluginProcessor::applyIntervalPreset (halation::PresetID id)
+{
+    auto semitones = halation::IntervalPresets::getPreset (id);
+    m_ignoreParamChanges = true;
+    for (int i = 0; i < 8; ++i)
+    {
+        if (auto* p = m_apvts.getParameter (ParameterIDs::pathSemitones (i)))
+            p->setValueNotifyingHost (p->convertTo0to1 (semitones[static_cast<size_t> (i)]));
+    }
+    m_ignoreParamChanges = false;
 }
 
 //==============================================================================
