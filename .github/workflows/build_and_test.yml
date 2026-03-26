@@ -36,6 +36,7 @@ jobs:
     # (GitHub Actions disallows secrets.* directly in if expressions)
     env:
       HAVE_SIGNING_CERT: ${{ secrets.DEV_ID_APP_CERT != '' }}
+      HAVE_AZURE_SIGNING: ${{ secrets.AZURE_TENANT_ID != '' }}
     strategy:
       fail-fast: false # show all errors for each platform (vs. cancel jobs on error)
       matrix:
@@ -197,7 +198,7 @@ jobs:
           mv "packaging/Output/${{ env.ARTIFACT_NAME }}.exe" "${{ env.ARTIFACTS_PATH }}/"
 
       - name: Codesign with Azure Trusted Signing
-        if: ${{ runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Windows' && env.HAVE_AZURE_SIGNING == 'true' }}
         uses: azure/artifact-signing-action@v1
         with:
           # The Azure Active Directory tenant (directory) ID.
