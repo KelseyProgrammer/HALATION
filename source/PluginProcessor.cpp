@@ -15,6 +15,9 @@ PluginProcessor::PluginProcessor()
       m_apvts (*this, nullptr, "HALATION", createParameterLayout()),
       m_presetManager (m_apvts)
 {
+    // Report latency up front so hosts that query before prepareToPlay get the right value
+    setLatencySamples (halation::PitchShifter::kFFTSize);
+
     // Listen for preset selector and all path semitone changes
     m_apvts.addParameterListener (ParameterIDs::globalIntervalPreset, this);
     for (int i = 0; i < 8; ++i)
@@ -234,7 +237,13 @@ void PluginProcessor::parameterChanged (const juce::String& paramID, float newVa
     {
         auto id = static_cast<halation::PresetID> (static_cast<int> (newValue));
         if (id != halation::PresetID::Custom)
-            applyIntervalPreset (id);
+        {
+            // Defer to avoid re-entering APVTS notification machinery
+            juce::MessageManager::callAsync ([this, id]()
+            {
+                applyIntervalPreset (id);
+            });
+        }
     }
     else
     {
@@ -242,11 +251,17 @@ void PluginProcessor::parameterChanged (const juce::String& paramID, float newVa
         {
             if (paramID == ParameterIDs::pathSemitones (i))
             {
-                m_ignoreParamChanges = true;
-                if (auto* p = m_apvts.getParameter (ParameterIDs::globalIntervalPreset))
-                    p->setValueNotifyingHost (p->convertTo0to1 (
-                        static_cast<float> (halation::PresetID::Custom)));
-                m_ignoreParamChanges = false;
+                // Defer to avoid re-entering APVTS notification machinery
+                juce::MessageManager::callAsync ([this]()
+                {
+                    if (m_ignoreParamChanges)
+                        return;
+                    m_ignoreParamChanges = true;
+                    if (auto* p = m_apvts.getParameter (ParameterIDs::globalIntervalPreset))
+                        p->setValueNotifyingHost (p->convertTo0to1 (
+                            static_cast<float> (halation::PresetID::Custom)));
+                    m_ignoreParamChanges = false;
+                });
                 break;
             }
         }
