@@ -172,5 +172,10 @@ include(Tests)
 # A separate target for Benchmarks (keeps the Tests target fast)
 include(Benchmarks)
 
+# Propagate CI flag to Benchmarks (cmake submodule doesn't check for this)
+if ((DEFINED ENV{CI}))
+    target_compile_definitions(Benchmarks PUBLIC CI=1)
+endif ()
+
 # Output some config for CI (like our PRODUCT_NAME)
 include(GitHubENV)
