@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HalationEngine.h"
+#include "IntervalPresets.h"
 #include "PresetManager.h"
 #include "ParameterIDs.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -9,7 +10,8 @@
 #include "ipps.h"
 #endif
 
-class PluginProcessor : public juce::AudioProcessor
+class PluginProcessor : public juce::AudioProcessor,
+                        public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PluginProcessor();
@@ -41,15 +43,24 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    juce::AudioProcessorValueTreeState& getAPVTS() { return m_apvts; }
-    PresetManager&                      getPresetManager() { return m_presetManager; }
+    // Called on message thread when a listened parameter changes
+    void parameterChanged (const juce::String& paramID, float newValue) override;
+
+    juce::AudioProcessorValueTreeState& getAPVTS()        { return m_apvts; }
+    PresetManager&                      getPresetManager(){ return m_presetManager; }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
+    // Push the semitone array from a preset into the path params
+    void applyIntervalPreset (halation::PresetID id);
+
     juce::AudioProcessorValueTreeState m_apvts;
     halation::HalationEngine           m_engine;
     PresetManager                      m_presetManager;
+
+    // Guard against re-entrant parameterChanged calls when we update params programmatically
+    bool m_ignoreParamChanges { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };
