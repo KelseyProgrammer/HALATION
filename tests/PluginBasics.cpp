@@ -2,6 +2,7 @@
 #include <PluginProcessor.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <memory>
 
 TEST_CASE ("one is equal to one", "[dummy]")
 {
@@ -10,11 +11,11 @@ TEST_CASE ("one is equal to one", "[dummy]")
 
 TEST_CASE ("Plugin instance", "[instance]")
 {
-    PluginProcessor testPlugin;
+    auto testPlugin = std::make_unique<PluginProcessor>();
 
     SECTION ("name")
     {
-        CHECK_THAT (testPlugin.getName().toStdString(),
+        CHECK_THAT (testPlugin->getName().toStdString(),
             Catch::Matchers::Equals ("HALATION"));
     }
 }

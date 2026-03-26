@@ -3,11 +3,12 @@
 #include <PluginProcessor.h>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <memory>
 
 TEST_CASE ("Parameter IDs exist in APVTS", "[parameters]")
 {
-    PluginProcessor plugin;
-    auto& apvts = plugin.getAPVTS();
+    auto plugin = std::make_unique<PluginProcessor>();
+    auto& apvts = plugin->getAPVTS();
 
     REQUIRE (apvts.getParameter (ParameterIDs::globalNumPaths)       != nullptr);
     REQUIRE (apvts.getParameter (ParameterIDs::globalBloomRate)      != nullptr);
@@ -29,8 +30,8 @@ TEST_CASE ("Parameter IDs exist in APVTS", "[parameters]")
 
 TEST_CASE ("Global parameter defaults match spec", "[parameters]")
 {
-    PluginProcessor plugin;
-    auto& apvts = plugin.getAPVTS();
+    auto plugin = std::make_unique<PluginProcessor>();
+    auto& apvts = plugin->getAPVTS();
 
     CHECK (*apvts.getRawParameterValue (ParameterIDs::globalNumPaths)       == Catch::Approx (4.0f));
     CHECK (*apvts.getRawParameterValue (ParameterIDs::globalBloomRate)      == Catch::Approx (0.3f));
@@ -44,8 +45,8 @@ TEST_CASE ("Global parameter defaults match spec", "[parameters]")
 
 TEST_CASE ("Per-path parameter defaults match spec", "[parameters]")
 {
-    PluginProcessor plugin;
-    auto& apvts = plugin.getAPVTS();
+    auto plugin = std::make_unique<PluginProcessor>();
+    auto& apvts = plugin->getAPVTS();
 
     // Default preset is Fifths (index 2)
     const float fifthsSemitones[] = { 0.f, 7.f, 12.f, 19.f, -5.f, 7.f, -12.f, 5.f };

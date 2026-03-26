@@ -1,30 +1,33 @@
 #include <HalationEngine.h>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <memory>
+
+// HalationEngine owns 8 PathProcessors each with ~1.5MB of delay lines.
+// Always heap-allocate to avoid stack overflow on Windows (1MB default stack).
 
 TEST_CASE ("HalationEngine prepares and resets without crashing", "[engine]")
 {
-    halation::HalationEngine engine;
-    REQUIRE_NOTHROW (engine.prepare (44100.0, 512));
-    REQUIRE_NOTHROW (engine.reset());
+    auto engine = std::make_unique<halation::HalationEngine>();
+    REQUIRE_NOTHROW (engine->prepare (44100.0, 512));
+    REQUIRE_NOTHROW (engine->reset());
 }
 
 TEST_CASE ("HalationEngine produces no NaN or inf at any feedback value", "[engine]")
 {
-    halation::HalationEngine engine;
-    engine.prepare (44100.0, 512);
+    auto engine = std::make_unique<halation::HalationEngine>();
+    engine->prepare (44100.0, 512);
 
     for (float bloomRate : { 0.0f, 0.25f, 0.5f, 0.75f, 0.99f })
     {
-        engine.reset();
-        engine.setNumPaths (4);
-        engine.setGlobalParameters (bloomRate, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
+        engine->reset();
+        engine->setNumPaths (4);
+        engine->setGlobalParameters (bloomRate, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
 
         juce::AudioBuffer<float> buffer (2, 512);
 
         for (int block = 0; block < 300; ++block)
         {
-            // Alternating signal to exercise feedback accumulation
             for (int ch = 0; ch < 2; ++ch)
             {
                 auto* ptr = buffer.getWritePointer (ch);
@@ -32,7 +35,7 @@ TEST_CASE ("HalationEngine produces no NaN or inf at any feedback value", "[engi
                     ptr[n] = (n % 2 == 0) ? 0.3f : -0.3f;
             }
 
-            engine.process (buffer);
+            engine->process (buffer);
 
             INFO ("bloomRate=" << bloomRate << " block=" << block);
             for (int ch = 0; ch < 2; ++ch)
@@ -47,9 +50,9 @@ TEST_CASE ("HalationEngine produces no NaN or inf at any feedback value", "[engi
 
 TEST_CASE ("HalationEngine num_paths changes mid-stream produce no NaN", "[engine]")
 {
-    halation::HalationEngine engine;
-    engine.prepare (44100.0, 512);
-    engine.setGlobalParameters (0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
+    auto engine = std::make_unique<halation::HalationEngine>();
+    engine->prepare (44100.0, 512);
+    engine->setGlobalParameters (0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f);
 
     juce::AudioBuffer<float> buffer (2, 512);
 
@@ -62,7 +65,7 @@ TEST_CASE ("HalationEngine num_paths changes mid-stream produce no NaN", "[engin
                 ptr[n] = 0.1f * std::sin (juce::MathConstants<float>::twoPi
                                           * 440.0f * float (n) / 44100.0f);
         }
-        engine.process (buffer);
+        engine->process (buffer);
 
         for (int ch = 0; ch < 2; ++ch)
         {
@@ -72,15 +75,15 @@ TEST_CASE ("HalationEngine num_paths changes mid-stream produce no NaN", "[engin
         }
     };
 
-    engine.setNumPaths (4);
+    engine->setNumPaths (4);
     for (int i = 0; i < 10; ++i) fillAndProcess();
 
-    engine.setNumPaths (8);
+    engine->setNumPaths (8);
     for (int i = 0; i < 10; ++i) fillAndProcess();
 
-    engine.setNumPaths (2);
+    engine->setNumPaths (2);
     for (int i = 0; i < 10; ++i) fillAndProcess();
 
-    engine.setNumPaths (4);
+    engine->setNumPaths (4);
     for (int i = 0; i < 10; ++i) fillAndProcess();
 }
