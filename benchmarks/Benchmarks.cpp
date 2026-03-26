@@ -12,10 +12,11 @@ TEST_CASE ("Boot performance")
     BENCHMARK_ADVANCED ("Processor destructor")
     (Catch::Benchmark::Chronometer meter)
     {
-        std::vector<Catch::Benchmark::destructable_object<PluginProcessor>> storage (size_t (meter.runs()));
-        for (auto& s : storage)
-            s.construct();
-        meter.measure ([&] (int i) { storage[(size_t) i].destruct(); });
+        std::vector<std::unique_ptr<PluginProcessor>> storage;
+        storage.reserve (static_cast<size_t> (meter.runs()));
+        for (int i = 0; i < meter.runs(); ++i)
+            storage.push_back (std::make_unique<PluginProcessor>());
+        meter.measure ([&] (int i) { storage[static_cast<size_t> (i)].reset(); });
     };
 
     BENCHMARK_ADVANCED ("Editor open and close")
