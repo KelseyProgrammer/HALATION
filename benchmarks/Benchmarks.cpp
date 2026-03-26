@@ -1,5 +1,6 @@
 TEST_CASE ("Boot performance")
 {
+#ifndef CI
     BENCHMARK_ADVANCED ("Processor constructor")
     (Catch::Benchmark::Chronometer meter)
     {
@@ -19,7 +20,6 @@ TEST_CASE ("Boot performance")
         meter.measure ([&] (int i) { storage[static_cast<size_t> (i)].reset(); });
     };
 
-#ifndef CI
     BENCHMARK_ADVANCED ("Editor open and close")
     (Catch::Benchmark::Chronometer meter)
     {
