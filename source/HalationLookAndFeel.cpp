@@ -32,9 +32,22 @@ HalationLookAndFeel::HalationLookAndFeel()
     setColour (juce::Label::textColourId, mutedLabel());
 
     // TextButton
-    setColour (juce::TextButton::buttonColourId,   background().brighter (0.1f));
-    setColour (juce::TextButton::textColourOffId,  mutedLabel());
+    setColour (juce::TextButton::buttonColourId,   background().brighter (0.08f));
+    setColour (juce::TextButton::textColourOffId,  accentAmber().withAlpha (0.7f));
     setColour (juce::TextButton::textColourOnId,   accentAmber());
+
+    // ComboBox
+    setColour (juce::ComboBox::backgroundColourId,        background().brighter (0.12f));
+    setColour (juce::ComboBox::textColourId,              accentAmber().withAlpha (0.9f));
+    setColour (juce::ComboBox::outlineColourId,           accentAmber().withAlpha (0.35f));
+    setColour (juce::ComboBox::focusedOutlineColourId,    accentAmber().withAlpha (0.7f));
+    setColour (juce::ComboBox::arrowColourId,             accentAmber());
+
+    // PopupMenu
+    setColour (juce::PopupMenu::backgroundColourId,              background().brighter (0.08f));
+    setColour (juce::PopupMenu::textColourId,                    juce::Colours::white.withAlpha (0.75f));
+    setColour (juce::PopupMenu::highlightedBackgroundColourId,   accentAmber().withAlpha (0.18f));
+    setColour (juce::PopupMenu::highlightedTextColourId,         accentAmber());
 }
 
 void HalationLookAndFeel::drawRotarySlider (juce::Graphics& g,
@@ -44,11 +57,11 @@ void HalationLookAndFeel::drawRotarySlider (juce::Graphics& g,
                                              float rotaryEndAngle,
                                              juce::Slider& slider)
 {
-    const float radius     = static_cast<float> (juce::jmin (width, height)) * 0.5f - 4.0f;
-    const float centreX    = static_cast<float> (x) + static_cast<float> (width)  * 0.5f;
-    const float centreY    = static_cast<float> (y) + static_cast<float> (height) * 0.5f;
-    const float angle      = rotaryStartAngle
-                             + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
+    const float radius  = static_cast<float> (juce::jmin (width, height)) * 0.5f - 4.0f;
+    const float centreX = static_cast<float> (x) + static_cast<float> (width)  * 0.5f;
+    const float centreY = static_cast<float> (y) + static_cast<float> (height) * 0.5f;
+    const float angle   = rotaryStartAngle
+                          + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
     // Track arc (background)
     {
@@ -56,7 +69,7 @@ void HalationLookAndFeel::drawRotarySlider (juce::Graphics& g,
         trackArc.addArc (centreX - radius, centreY - radius,
                          radius * 2.0f, radius * 2.0f,
                          rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour (mutedLabel().withAlpha (0.4f));
+        g.setColour (mutedLabel().withAlpha (0.35f));
         g.strokePath (trackArc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
     }
@@ -76,8 +89,10 @@ void HalationLookAndFeel::drawRotarySlider (juce::Graphics& g,
     // Indicator dot at tip
     {
         const float dotRadius = 3.0f;
-        float dotX = centreX + (radius - 2.0f) * std::cos (angle - juce::MathConstants<float>::halfPi);
-        float dotY = centreY + (radius - 2.0f) * std::sin (angle - juce::MathConstants<float>::halfPi);
+        const float dotX = centreX + (radius - 2.0f)
+                           * std::cos (angle - juce::MathConstants<float>::halfPi);
+        const float dotY = centreY + (radius - 2.0f)
+                           * std::sin (angle - juce::MathConstants<float>::halfPi);
         g.setColour (slider.findColour (juce::Slider::thumbColourId));
         g.fillEllipse (dotX - dotRadius, dotY - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
     }
@@ -99,16 +114,18 @@ void HalationLookAndFeel::drawLinearSlider (juce::Graphics& g,
         const float thumbRadius = 5.0f;
 
         // Track
-        g.setColour (mutedLabel().withAlpha (0.3f));
-        g.drawLine (trackLeft, trackY, trackRight, trackY, 2.0f);
+        g.setColour (mutedLabel().withAlpha (0.25f));
+        g.drawLine (trackLeft, trackY, trackRight, trackY, 1.5f);
 
         // Fill to position
-        auto fillColour = slider.findColour (juce::Slider::rotarySliderFillColourId);
+        auto fillColour = slider.findColour (juce::Slider::trackColourId);
+        if (fillColour == juce::Colours::transparentBlack)
+            fillColour = slider.findColour (juce::Slider::rotarySliderFillColourId);
         g.setColour (fillColour);
-        g.drawLine (trackLeft, trackY, sliderPos, trackY, 2.5f);
+        g.drawLine (trackLeft, trackY, sliderPos, trackY, 2.0f);
 
         // Thumb dot
-        g.setColour (fillColour);
+        g.setColour (slider.findColour (juce::Slider::thumbColourId));
         g.fillEllipse (sliderPos - thumbRadius, trackY - thumbRadius,
                        thumbRadius * 2.0f, thumbRadius * 2.0f);
     }
@@ -117,6 +134,76 @@ void HalationLookAndFeel::drawLinearSlider (juce::Graphics& g,
         LookAndFeel_V4::drawLinearSlider (g, x, y, width, height,
                                           sliderPos, 0.0f, 1.0f, style, slider);
     }
+}
+
+void HalationLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
+                                                 const juce::Colour& backgroundColour,
+                                                 bool shouldDrawButtonAsHighlighted,
+                                                 bool shouldDrawButtonAsDown)
+{
+    auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
+    const auto base = backgroundColour.withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f);
+
+    g.setColour (shouldDrawButtonAsDown    ? base.brighter (0.25f) :
+                 shouldDrawButtonAsHighlighted ? base.brighter (0.1f) : base);
+    g.fillRoundedRectangle (bounds, 3.0f);
+
+    g.setColour (accentAmber().withAlpha (0.28f));
+    g.drawRoundedRectangle (bounds, 3.0f, 1.0f);
+}
+
+void HalationLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height,
+                                         bool /*isButtonDown*/,
+                                         int /*buttonX*/, int /*buttonY*/,
+                                         int /*buttonW*/, int /*buttonH*/,
+                                         juce::ComboBox& /*box*/)
+{
+    const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
+
+    g.setColour (background().brighter (0.12f));
+    g.fillRoundedRectangle (bounds, 3.0f);
+
+    g.setColour (accentAmber().withAlpha (0.35f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 1.0f);
+
+    // Arrow
+    const float arrowX = (float) width - 14.0f;
+    const float arrowY = (float) height * 0.5f;
+    const float arrowW = 6.0f;
+    const float arrowH = 4.0f;
+
+    juce::Path arrow;
+    arrow.addTriangle (arrowX - arrowW * 0.5f, arrowY - arrowH * 0.4f,
+                       arrowX + arrowW * 0.5f, arrowY - arrowH * 0.4f,
+                       arrowX,                  arrowY + arrowH * 0.6f);
+    g.setColour (accentAmber().withAlpha (0.8f));
+    g.fillPath (arrow);
+}
+
+void HalationLookAndFeel::drawPopupMenuItem (juce::Graphics& g,
+                                              const juce::Rectangle<int>& area,
+                                              bool /*isSeparator*/, bool isActive,
+                                              bool isHighlighted, bool isTicked,
+                                              bool /*hasSubMenu*/,
+                                              const juce::String& text,
+                                              const juce::String& /*shortcutKeyText*/,
+                                              const juce::Drawable* /*icon*/,
+                                              const juce::Colour* /*textColour*/)
+{
+    if (isHighlighted && isActive)
+    {
+        g.setColour (accentAmber().withAlpha (0.16f));
+        g.fillRect (area);
+    }
+
+    const auto colour = isTicked    ? accentAmber() :
+                        isActive    ? juce::Colours::white.withAlpha (0.75f)
+                                    : mutedLabel();
+    g.setColour (colour);
+    g.setFont (juce::Font (juce::FontOptions{}
+        .withName (juce::Font::getDefaultMonospacedFontName())
+        .withHeight (9.5f)));
+    g.drawText (text, area.reduced (10, 0), juce::Justification::centredLeft, true);
 }
 
 juce::Font HalationLookAndFeel::getLabelFont (juce::Label& /*label*/)

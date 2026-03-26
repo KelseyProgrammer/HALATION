@@ -20,7 +20,6 @@ public:
 
 private:
     void timerCallback() override;
-    void refreshPresetLabel();
     void refreshPathVisibility();
 
     PluginProcessor&    m_processorRef;
@@ -32,22 +31,19 @@ private:
     juce::TextButton m_pathsInc { "+" };
     juce::Label      m_pathsCountLabel;
 
-    // ── Preset strip ─────────────────────────────────────────────────────────
-    juce::TextButton m_presetPrev { "<" };
-    juce::TextButton m_presetNext { ">" };
-    juce::Label      m_presetLabel;
+    // ── Interval preset dropdown ──────────────────────────────────────────────
+    juce::ComboBox m_intervalPresetCombo;
+    std::unique_ptr<juce::ComboBoxParameterAttachment> m_intervalPresetAttach;
 
     // ── Bloom visualizer ─────────────────────────────────────────────────────
     BloomVisualizer m_bloomViz;
 
-    // ── Global knobs (right panel) ────────────────────────────────────────────
+    // ── Global knobs (right panel) — text is painted, not Label components ───
     juce::Slider m_bloomKnob   { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
     juce::Slider m_staggerKnob { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
     juce::Slider m_tiltKnob    { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
     juce::Slider m_dampingKnob { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
     juce::Slider m_chaosKnob   { juce::Slider::RotaryVerticalDrag, juce::Slider::NoTextBox };
-    juce::Label  m_bloomKnobLabel, m_staggerKnobLabel, m_tiltKnobLabel,
-                 m_dampingKnobLabel, m_chaosKnobLabel;
 
     std::unique_ptr<juce::SliderParameterAttachment> m_bloomAttach;
     std::unique_ptr<juce::SliderParameterAttachment> m_staggerAttach;

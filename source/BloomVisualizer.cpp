@@ -31,62 +31,104 @@ void BloomVisualizer::paint (juce::Graphics& g)
         *m_apvts.getRawParameterValue (ParameterIDs::globalNumPaths));
     const float bloomRate = *m_apvts.getRawParameterValue (ParameterIDs::globalBloomRate);
 
-    // Outer glow ring — brightness tracks bloom rate
+    // Subtle outer glow ring
     {
-        const float ringR = maxRadius * 1.08f;
-        g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.06f + bloomRate * 0.14f));
-        g.drawEllipse (cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f, 1.5f);
-        const float ring2R = maxRadius * 0.6f;
-        g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.04f + bloomRate * 0.06f));
-        g.drawEllipse (cx - ring2R, cy - ring2R, ring2R * 2.0f, ring2R * 2.0f, 0.8f);
+        const float ringR = maxRadius * 1.06f;
+        g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.05f + bloomRate * 0.10f));
+        g.drawEllipse (cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f, 1.2f);
     }
 
-    // Arms — one per active path
+    if (numPaths <= 0)
+        return;
+
+    // Angular half-width per wedge — fills ~70% of each slice
+    const float halfAngle = juce::MathConstants<float>::pi
+                            / static_cast<float> (numPaths) * 0.70f;
+
     for (int i = 0; i < numPaths; ++i)
     {
         const float semitones = *m_apvts.getRawParameterValue (ParameterIDs::pathSemitones (i));
         const float level     = *m_apvts.getRawParameterValue (ParameterIDs::pathLevel     (i));
         const auto  colour    = HalationLookAndFeel::pathColour (i);
 
-        // Angle: evenly spaced, top-start
+        // Angle: evenly spaced, starting from top
         const float angle = -juce::MathConstants<float>::halfPi
                             + static_cast<float> (i)
                               * juce::MathConstants<float>::twoPi
                               / static_cast<float> (numPaths);
 
-        // Length: semitones [-24..+24] mapped to [18%..100%] of maxRadius
+        // Arm length: semitones [-24..+24] → [20%..100%] of maxRadius
         const float normSemi = (semitones + 24.0f) / 48.0f;
-        const float armLen   = maxRadius * (0.18f + normSemi * 0.82f);
+        const float armLen   = maxRadius * (0.20f + normSemi * 0.80f);
 
-        const float tipX = cx + std::cos (angle) * armLen;
-        const float tipY = cy + std::sin (angle) * armLen;
+        const float leftAngle  = angle - halfAngle;
+        const float rightAngle = angle + halfAngle;
 
-        // Arm line — thicker at high bloom
-        const float alpha = juce::jlimit (0.0f, 1.0f, 0.3f + level * 0.5f + bloomRate * 0.2f);
-        g.setColour (colour.withAlpha (alpha));
-        g.drawLine (cx, cy, tipX, tipY, 1.5f + bloomRate * 2.5f);
+        // ── Filled wedge ─────────────────────────────────────────────────────
+        juce::Path wedge;
+        wedge.startNewSubPath (cx, cy);
+        wedge.lineTo (cx + std::cos (leftAngle) * armLen,
+                      cy + std::sin (leftAngle) * armLen);
 
-        // Tip glow dot
-        const float dotR = 3.5f + level * 4.5f;
-        g.setColour (colour.withAlpha (juce::jlimit (0.0f, 1.0f, alpha + 0.15f)));
+        // Arc across the tip (12 segments)
+        constexpr int kArcSegs = 12;
+        for (int j = 1; j <= kArcSegs; ++j)
+        {
+            const float a = leftAngle + (rightAngle - leftAngle)
+                            * static_cast<float> (j) / static_cast<float> (kArcSegs);
+            wedge.lineTo (cx + std::cos (a) * armLen,
+                          cy + std::sin (a) * armLen);
+        }
+        wedge.closeSubPath();
+
+        const float fillAlpha = juce::jlimit (0.0f, 1.0f,
+                                              0.22f + level * 0.18f + bloomRate * 0.12f);
+        g.setColour (colour.withAlpha (fillAlpha));
+        g.fillPath (wedge);
+
+        // Soft inner glow on the wedge (brighter narrow fill near center)
+        juce::Path innerWedge;
+        const float innerLen = armLen * 0.55f;
+        innerWedge.startNewSubPath (cx, cy);
+        innerWedge.lineTo (cx + std::cos (leftAngle) * innerLen,
+                           cy + std::sin (leftAngle) * innerLen);
+        for (int j = 1; j <= kArcSegs; ++j)
+        {
+            const float a = leftAngle + (rightAngle - leftAngle)
+                            * static_cast<float> (j) / static_cast<float> (kArcSegs);
+            innerWedge.lineTo (cx + std::cos (a) * innerLen,
+                               cy + std::sin (a) * innerLen);
+        }
+        innerWedge.closeSubPath();
+        g.setColour (colour.withAlpha (fillAlpha * 0.35f));
+        g.fillPath (innerWedge);
+
+        // Tip dot
+        const float tipX  = cx + std::cos (angle) * armLen;
+        const float tipY  = cy + std::sin (angle) * armLen;
+        const float dotR  = 4.0f + level * 3.0f + bloomRate * 2.0f;
+        g.setColour (colour.withAlpha (0.85f));
         g.fillEllipse (tipX - dotR * 0.5f, tipY - dotR * 0.5f, dotR, dotR);
 
         // Interval name at tip
         const auto name = halation::IntervalPresets::semitoneToIntervalName (
             static_cast<int> (std::round (semitones)));
-        g.setColour (colour.withAlpha (0.65f));
+        g.setColour (colour.withAlpha (0.70f));
         g.setFont (juce::Font (juce::FontOptions{}
             .withName (juce::Font::getDefaultMonospacedFontName())
-            .withHeight (8.0f)));
+            .withHeight (8.5f)));
         g.drawText (name,
-                    static_cast<int> (tipX) - 14,
-                    static_cast<int> (tipY) - 9,
-                    28, 10,
+                    static_cast<int> (tipX) - 16,
+                    static_cast<int> (tipY) - 10,
+                    32, 11,
                     juce::Justification::centred, false);
     }
 
-    // Center amber core dot
-    const float coreR = 5.0f + bloomRate * 5.0f;
-    g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.9f));
-    g.fillEllipse (cx - coreR * 0.5f, cy - coreR * 0.5f, coreR, coreR);
+    // Center amber core — glows with bloom
+    const float coreR = 6.0f + bloomRate * 6.0f;
+    g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.20f + bloomRate * 0.25f));
+    g.fillEllipse (cx - coreR, cy - coreR, coreR * 2.0f, coreR * 2.0f);
+
+    g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.90f));
+    g.fillEllipse (cx - 4.0f, cy - 4.0f, 8.0f, 8.0f);
 }
