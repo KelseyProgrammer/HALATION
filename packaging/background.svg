@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 640" width="1024" height="640">
+  <defs>
+
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0%"   stop-color="#1e1b2e"/>
+      <stop offset="100%" stop-color="#12111a"/>
+    </radialGradient>
+
+    <!-- Bloom arms (same geometry as icon, scaled for landscape canvas)
+         Center: (512, 280). Arms radiate from there.
+         cy = 280 - 170 = 110, ry = 170 → base at y=280, tip at y=-60 (clipped). -->
+    <linearGradient id="ag0" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#e8a84a" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#e8a84a" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#e8a84a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag1" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#c4707a" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#c4707a" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#c4707a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag2" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#8870c0" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#8870c0" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#8870c0" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag3" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#4aa4b8" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#4aa4b8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#4aa4b8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag4" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#d46a30" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#d46a30" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#d46a30" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag5" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#7a9e3a" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#7a9e3a" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7a9e3a" stop-opacity="0"/>
+    </linearGradient>
+
+    <radialGradient id="haze" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#e8a84a" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#e8a84a" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#fff8e0"/>
+      <stop offset="40%"  stop-color="#e8a84a"/>
+      <stop offset="100%" stop-color="#c07030" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Bottom text fade: mask so text doesn't fight with bloom -->
+    <linearGradient id="textFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="white" stop-opacity="0"/>
+      <stop offset="40%"  stop-color="white" stop-opacity="1"/>
+      <stop offset="100%" stop-color="white" stop-opacity="1"/>
+    </linearGradient>
+    <mask id="textMask">
+      <rect width="1024" height="640" fill="url(#textFade)"/>
+    </mask>
+
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="640" fill="url(#bg)"/>
+
+  <!-- Bloom bloom centered at (512, 272) -->
+
+  <!-- Glow halos -->
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag0)" opacity="0.20" transform="rotate(0,   512, 272)"/>
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag1)" opacity="0.20" transform="rotate(60,  512, 272)"/>
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag2)" opacity="0.20" transform="rotate(120, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag3)" opacity="0.20" transform="rotate(180, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag4)" opacity="0.20" transform="rotate(240, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="95"  ry="170" fill="url(#ag5)" opacity="0.20" transform="rotate(300, 512, 272)"/>
+
+  <!-- Main arms -->
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag0)" transform="rotate(0,   512, 272)"/>
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag1)" transform="rotate(60,  512, 272)"/>
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag2)" transform="rotate(120, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag3)" transform="rotate(180, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag4)" transform="rotate(240, 512, 272)"/>
+  <ellipse cx="512" cy="102" rx="46"  ry="170" fill="url(#ag5)" transform="rotate(300, 512, 272)"/>
+
+  <!-- Center haze -->
+  <circle cx="512" cy="272" r="145" fill="url(#haze)" opacity="0.9"/>
+
+  <!-- Core glow -->
+  <circle cx="512" cy="272" r="70" fill="url(#coreGlow)"/>
+
+  <!-- Core dot -->
+  <circle cx="512" cy="272" r="26" fill="#fff8e0"/>
+  <circle cx="512" cy="272" r="17" fill="#e8a84a"/>
+
+  <!-- Text block, masked to fade in from bloom center downward -->
+  <g mask="url(#textMask)">
+
+    <!-- Plugin name -->
+    <text
+      x="512" y="436"
+      font-family="'Space Mono', 'Courier New', monospace"
+      font-size="72"
+      font-weight="700"
+      letter-spacing="14"
+      text-anchor="middle"
+      fill="#e8a84a">HALATION</text>
+
+    <!-- Subtitle -->
+    <text
+      x="512" y="482"
+      font-family="'Space Mono', 'Courier New', monospace"
+      font-size="16"
+      letter-spacing="5"
+      text-anchor="middle"
+      fill="#5a5070">FEEDBACK PITCH ECOSYSTEM</text>
+
+    <!-- Brand -->
+    <text
+      x="512" y="560"
+      font-family="'Space Mono', 'Courier New', monospace"
+      font-size="13"
+      letter-spacing="4"
+      text-anchor="middle"
+      fill="#3a3050">AMENT AUDIO</text>
+
+  </g>
+
+</svg>

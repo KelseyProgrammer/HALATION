@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+
+    <!-- Background: subtle center-brightened navy -->
+    <radialGradient id="bg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%"   stop-color="#1e1b2e"/>
+      <stop offset="100%" stop-color="#12111a"/>
+    </radialGradient>
+
+    <!-- Per-arm linear gradients (objectBoundingBox default)
+         y1="1" = bottom of ellipse bbox = arm base at icon center = opaque
+         y2="0" = top of ellipse bbox = arm tip = transparent
+         Gradient rotates with the element, so orientation is always radial. -->
+    <linearGradient id="ag0" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#e8a84a" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#e8a84a" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#e8a84a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag1" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#c4707a" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#c4707a" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#c4707a" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag2" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#8870c0" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#8870c0" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#8870c0" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag3" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#4aa4b8" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#4aa4b8" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#4aa4b8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag4" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#d46a30" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#d46a30" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#d46a30" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ag5" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#7a9e3a" stop-opacity="1"/>
+      <stop offset="55%"  stop-color="#7a9e3a" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#7a9e3a" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Ambient bloom haze around center -->
+    <radialGradient id="haze" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#e8a84a" stop-opacity="0.28"/>
+      <stop offset="55%"  stop-color="#c07830" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#e8a84a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Core glow -->
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#fff8e0"/>
+      <stop offset="42%"  stop-color="#e8a84a"/>
+      <stop offset="100%" stop-color="#c07030" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Outer ambient haze -->
+  <circle cx="512" cy="512" r="430" fill="url(#haze)" opacity="0.7"/>
+
+  <!-- Arm glow pass: wide, translucent halos
+       Ellipse geometry: cy=312, ry=200 → base at y=512 (icon center), tip at y=112
+       All 6 arms share identical ellipse shape, only the rotation and color differ. -->
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag0)" opacity="0.22" transform="rotate(0,   512, 512)"/>
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag1)" opacity="0.22" transform="rotate(60,  512, 512)"/>
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag2)" opacity="0.22" transform="rotate(120, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag3)" opacity="0.22" transform="rotate(180, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag4)" opacity="0.22" transform="rotate(240, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="104" ry="200" fill="url(#ag5)" opacity="0.22" transform="rotate(300, 512, 512)"/>
+
+  <!-- Main arms: crisp, narrower petals -->
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag0)" transform="rotate(0,   512, 512)"/>
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag1)" transform="rotate(60,  512, 512)"/>
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag2)" transform="rotate(120, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag3)" transform="rotate(180, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag4)" transform="rotate(240, 512, 512)"/>
+  <ellipse cx="512" cy="312" rx="54"  ry="200" fill="url(#ag5)" transform="rotate(300, 512, 512)"/>
+
+  <!-- Central haze overlay (reinforces bloom at core) -->
+  <circle cx="512" cy="512" r="180" fill="url(#haze)" opacity="1"/>
+
+  <!-- Core glow -->
+  <circle cx="512" cy="512" r="88" fill="url(#coreGlow)"/>
+
+  <!-- Core dot -->
+  <circle cx="512" cy="512" r="34" fill="#fff8e0"/>
+  <circle cx="512" cy="512" r="22" fill="#e8a84a"/>
+
+</svg>
