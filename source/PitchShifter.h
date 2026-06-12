@@ -7,9 +7,15 @@
 namespace halation
 {
 
-// Phase vocoder pitch shifter.
+// Phase vocoder pitch shifter with identity phase locking.
 // FFT size: 2048, hop: 512 (4x overlap), Hann window.
 // Introduces kFFTSize samples of latency at any sample rate.
+//
+// Phase locking (Laroche/Dolson): spectral peaks get the standard phase
+// vocoder phase advance; bins around each peak are locked to the peak's
+// phase rotation, preserving vertical phase coherence between partials.
+// This removes most of the metallic/phasey artifact of a plain vocoder —
+// important here because artifacts compound every feedback cycle.
 class PitchShifter
 {
 public:
@@ -41,8 +47,14 @@ private:
     std::array<float,   kFFTSize> m_window      {};
     std::array<float,   kFFTSize> m_inputFifo   {};
     std::array<float,   kFFTSize> m_outputAccum {};
-    std::array<float,   kNumBins> m_lastInputPhase  {};
-    std::array<float,   kNumBins> m_lastOutputPhase {};
+
+    // Per-bin analysis scratch (members so the audio thread never grows the stack)
+    std::array<float, kNumBins> m_lastInputPhase {};
+    std::array<float, kNumBins> m_synthPhase     {};  // source-bin indexed
+    std::array<float, kNumBins> m_mags           {};
+    std::array<float, kNumBins> m_phases         {};
+    std::array<float, kNumBins> m_deltas         {};
+    std::array<int,   kNumBins> m_peakBins       {};
 
     int   m_fifoIndex   { 0 };
     float m_pitchRatio  { 1.0f };

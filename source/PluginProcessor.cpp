@@ -37,33 +37,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     // Global parameters
-    layout.add (std::make_unique<juce::AudioParameterInt>  (ParameterIDs::globalNumPaths,
+    layout.add (std::make_unique<juce::AudioParameterInt>  (juce::ParameterID { ParameterIDs::globalNumPaths, 1 },
                                                              "Paths", 2, 8, 4));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalBloomRate,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalBloomRate, 1 },
                                                              "Bloom",
                                                              juce::NormalisableRange<float> (0.0f, 1.0f),
                                                              0.3f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalStagger,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalStagger, 1 },
                                                              "Stagger",
                                                              juce::NormalisableRange<float> (0.0f, 1.0f),
                                                              0.5f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalSpectralTilt,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalSpectralTilt, 1 },
                                                              "Tilt",
                                                              juce::NormalisableRange<float> (-1.0f, 1.0f),
                                                              -0.2f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalDamping,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalDamping, 1 },
                                                              "Damping",
                                                              juce::NormalisableRange<float> (0.0f, 1.0f),
                                                              0.4f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalChaos,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalChaos, 1 },
                                                              "Chaos",
                                                              juce::NormalisableRange<float> (0.0f, 1.0f),
                                                              0.15f));
-    layout.add (std::make_unique<juce::AudioParameterFloat> (ParameterIDs::globalMix,
+    layout.add (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { ParameterIDs::globalMix, 1 },
                                                              "Mix",
                                                              juce::NormalisableRange<float> (0.0f, 1.0f),
                                                              0.7f));
-    layout.add (std::make_unique<juce::AudioParameterInt>  (ParameterIDs::globalIntervalPreset,
+    layout.add (std::make_unique<juce::AudioParameterInt>  (juce::ParameterID { ParameterIDs::globalIntervalPreset, 1 },
                                                              "Preset", 0, 5, 2));
 
     // Per-path parameters
@@ -72,13 +72,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     for (int i = 0; i < 8; ++i)
     {
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            ParameterIDs::pathSemitones (i),
+            juce::ParameterID { ParameterIDs::pathSemitones (i), 1 },
             "Path " + juce::String (i + 1) + " Semi",
             juce::NormalisableRange<float> (-24.0f, 24.0f),
             fifthsDefaults[static_cast<size_t> (i)]));
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            ParameterIDs::pathLevel (i),
+            juce::ParameterID { ParameterIDs::pathLevel (i), 1 },
             "Path " + juce::String (i + 1) + " Level",
             juce::NormalisableRange<float> (0.0f, 1.0f),
             1.0f));
@@ -86,7 +86,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Default pan: spread evenly from -0.875 to +0.875
         float defaultPan = -0.875f + static_cast<float> (i) * 0.25f;
         layout.add (std::make_unique<juce::AudioParameterFloat> (
-            ParameterIDs::pathPan (i),
+            juce::ParameterID { ParameterIDs::pathPan (i), 1 },
             "Path " + juce::String (i + 1) + " Pan",
             juce::NormalisableRange<float> (-1.0f, 1.0f),
             defaultPan));
@@ -127,9 +127,9 @@ bool PluginProcessor::isMidiEffect() const
 
 double PluginProcessor::getTailLengthSeconds() const
 {
-    // Maximum delay time: kBaseDelayMs + kMaxStaggerMs * 7 paths = 20 + 560 = 580ms
-    // Add phase vocoder latency (~46ms). Round up generously.
-    return 1.0;
+    // The feedback loop can sustain indefinitely at high bloom rates, so the
+    // tail is unbounded. Hosts cap this at their own render-tail limit.
+    return std::numeric_limits<double>::infinity();
 }
 
 int PluginProcessor::getNumPrograms()         { return 1; }

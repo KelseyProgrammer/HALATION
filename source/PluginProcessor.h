@@ -48,6 +48,7 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS()        { return m_apvts; }
     PresetManager&                      getPresetManager(){ return m_presetManager; }
+    const halation::HalationEngine&     getEngine() const { return m_engine; }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

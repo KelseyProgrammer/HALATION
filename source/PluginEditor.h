@@ -35,6 +35,11 @@ private:
     juce::ComboBox m_intervalPresetCombo;
     std::unique_ptr<juce::ComboBoxParameterAttachment> m_intervalPresetAttach;
 
+    // ── Preset navigation (header strip) ─────────────────────────────────────
+    juce::TextButton m_presetPrev { "<" };
+    juce::TextButton m_presetNext { ">" };
+    juce::Label      m_presetNameLabel;
+
     // ── Bloom visualizer ─────────────────────────────────────────────────────
     BloomVisualizer m_bloomViz;
 
@@ -56,9 +61,11 @@ private:
     juce::Label  m_mixLabel;
     std::unique_ptr<juce::SliderParameterAttachment> m_mixAttach;
 
-    // ── Melatonin inspector ───────────────────────────────────────────────────
+    // ── Melatonin inspector (debug builds only) ───────────────────────────────
+   #if JUCE_DEBUG
     juce::TextButton m_inspectButton { "Inspect" };
     std::unique_ptr<melatonin::Inspector> m_inspector;
+   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

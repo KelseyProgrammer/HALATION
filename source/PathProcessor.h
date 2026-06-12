@@ -24,28 +24,32 @@ public:
     void reset();
 
     // Process one stereo frame. Returns the wet output pair.
-    // bloomRate: smoothed feedback gain. staggerDelaySamples: per-path offset.
-    std::pair<float, float> process (float inputL, float inputR,
-                                     float bloomRate,
-                                     int   staggerDelaySamples);
+    // bloomRate: smoothed feedback gain.
+    std::pair<float, float> process (float inputL, float inputR, float bloomRate);
 
     void setSemitones        (float semitones);
-    void setChaosOffsetCents (float cents);      // added to base semitones before each frame
+    // Per-channel chaos offsets, updated once per block by the engine.
+    // L/R differ slightly so the voices drift apart in the stereo field.
+    void setChaosOffsetCents (float centsL, float centsR);
     void setLevel            (float level);
     void setPan              (float pan);         // -1.0 left … +1.0 right
     void setSpectralTilt     (float tilt);
     void setDamping          (float damping);
 
+    // Target delay in samples (base + stagger). Smoothed internally over 50ms
+    // and read with linear interpolation so stagger sweeps don't click.
+    void setDelaySamples     (float delaySamples);
+
     int getLatencySamples() const;
 
 private:
-    float readDelay  (int delaySamples, int channel) const;
+    float readDelayInterpolated (float delaySamples, int channel) const;
     void  writeDelay (float sampleL, float sampleR);
 
     // Simple 1-pole DC blocking highpass at ~10 Hz
     float dcBlock (float x, float& prevIn, float& prevOut) const noexcept;
 
-    void updatePitchRatio();
+    void updatePitchRatios();
 
     PitchShifter m_pitchShifterL;
     PitchShifter m_pitchShifterR;
@@ -66,13 +70,15 @@ private:
     float m_dcCoeff    { 0.9997f }; // updated in prepare()
 
     // Pitch
-    float m_baseSemitones      { 0.0f };
-    float m_chaosOffsetCents   { 0.0f };
+    float m_baseSemitones     { 0.0f };
+    float m_chaosOffCentsL    { 0.0f };
+    float m_chaosOffCentsR    { 0.0f };
 
-    // Level and pan with 20ms smoothing
+    // Level and pan with 20ms smoothing, delay time with 50ms smoothing
     juce::SmoothedValue<float> m_levelSmoothed;
     juce::SmoothedValue<float> m_panLeftSmoothed;
     juce::SmoothedValue<float> m_panRightSmoothed;
+    juce::SmoothedValue<float> m_delaySmoothed;
 
     double m_sampleRate { 44100.0 };
 };

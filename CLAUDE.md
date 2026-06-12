@@ -74,7 +74,7 @@ HalationEngine         — orchestrates all DSP, one instance owned by Processor
 void prepare(double sampleRate, int maxBlockSize);
 void reset();
 void process(juce::AudioBuffer<float>& buffer);
-void setNumPaths(int n);           // 2–8, safe to call on message thread w/ lock
+void setNumPaths(int n);           // 2–8, called from the audio thread (processBlock)
 void setPathInterval(int path, float semitones);
 void setGlobalParameters(float bloomRate, float stagger, float spectralTilt,
                          float damping, float chaos, float mix);
@@ -168,7 +168,9 @@ So at full stagger, paths arrive spread across 20–180ms. At zero stagger, all 
 ### Feedback Topology
 Each `PathProcessor` feeds back into **itself only** (single-path feedback). A cross-feedback mode can be a v1.1 feature — do not implement it in v1.0. This keeps CPU predictable and avoids instability edge cases.
 
-Feedback gain = `bloom_rate` (global). Per-path `level` scales the wet output only, not the feedback tap.
+Feedback gain = `bloom_rate` (global). Per-path `level` scales the wet output only, not the feedback tap. The feedback tap is soft-clipped with `tanh` after the spectral tilt — this bounds runaway feedback musically (tape-style saturation) before the output limiter ever engages.
+
+The dry path is delayed by `kFFTSize` samples inside `HalationEngine` so dry and wet stay aligned with the latency reported to the host.
 
 ### DC Blocking
 Insert a DC-blocking filter at the end of each feedback path. Use a 1-pole highpass at 10 Hz. Without this, DC can accumulate in long feedback tails.
@@ -340,7 +342,7 @@ CI runs on Linux (ubuntu-22.04), macOS (macos-14), and Windows. All three platfo
 
 ## 12. Build Status
 
-All phases complete as of March 2026:
+Current version: **0.0.5** (April 2026)
 
 | Phase | Description | Status |
 |---|---|---|
@@ -350,12 +352,21 @@ All phases complete as of March 2026:
 | 4 | Preset navigation strip wired into editor | ✅ |
 | 5 | Full UI: PathRowComponent, BloomVisualizer, global knobs, mix strip | ✅ |
 | 6 | Catch2 tests: all four test files, green on all 3 CI platforms | ✅ |
+| 7 | UI rewrite: petal bloom visualizer, ComboBox preset selector, per-knob colors | ✅ |
+| 8 | Factory presets: all 6 embedded in PresetManager | ✅ |
+| 9 | PitchShifter OLA normalization fix, pluginval compliance | ✅ |
+| 10 | BloomVisualizer draggable tip interaction | ✅ |
+| 11 | GitHub release pipeline: 403 fix, macOS unsigned fallback, packaging assets | ✅ |
+| 12 | DSP/UI overhaul: RT-safe SpectralTilt biquads, block-rate pitch updates, dry-path latency alignment, smoothed interpolated stagger delay, tanh feedback soft-clip, equal-power summing/mix, stereo chaos decorrelation, phase-locked vocoder, preset nav strip restored, audio-reactive BloomVisualizer, double-click knob defaults, debug-only inspector | ✅ |
 
 ### What remains for v1.0 ship
-- **AU validation**: run `auval -v aufx Hala AmnA` locally on macOS to confirm AU compliance
-- **Code signing**: configure Apple Developer secrets in GitHub repo settings (`DEV_ID_APP_CERT`, `DEV_ID_APP_PASSWORD`, `DEV_ID_INSTALLER_CERT`, `DEV_ID_INSTALLER_PASSWORD`, `DEVELOPER_ID_APPLICATION`, `DEVELOPER_ID_INSTALLER`, `NOTARIZATION_USERNAME`, `NOTARIZATION_PASSWORD`, `TEAM_ID`)
-- **Factory presets**: implement the 6 factory presets listed in §9 as embedded XML in `PresetManager`
 - **CPU profiling**: verify ≤15% CPU at 44.1kHz / 512 samples / 8 paths / full feedback on M1
+- **Embedded fonts**: spec calls for Space Mono / DM Sans but the UI uses the system monospaced font — needs the TTFs added to assets and BinaryData
+
+### Done
+- **AU `versionHint`**: already satisfied — every parameter is constructed with `juce::ParameterID { id, 1 }`, whose second argument is the version hint
+- **AU validation**: `auval -v aufx Hala AmnA` — PASSED April 2026 (all render, format, parameter, and MIDI tests green)
+- **Code signing**: all 9 Apple Developer secrets configured in GitHub repo settings (`DEV_ID_APP_CERT`, `DEV_ID_APP_PASSWORD`, `DEV_ID_INSTALLER_CERT`, `DEV_ID_INSTALLER_PASSWORD`, `DEVELOPER_ID_APPLICATION`, `DEVELOPER_ID_INSTALLER`, `NOTARIZATION_USERNAME`, `NOTARIZATION_PASSWORD`, `TEAM_ID`) — confirmed April 2026
 
 ---
 

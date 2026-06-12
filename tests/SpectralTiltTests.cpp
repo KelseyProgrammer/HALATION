@@ -1,4 +1,5 @@
 #include <SpectralTilt.h>
+#include <juce_core/juce_core.h>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>

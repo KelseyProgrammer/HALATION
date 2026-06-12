@@ -18,7 +18,7 @@ namespace
 PluginEditor::PluginEditor (PluginProcessor& p)
     : AudioProcessorEditor (&p),
       m_processorRef (p),
-      m_bloomViz (p.getAPVTS())
+      m_bloomViz (p.getAPVTS(), p.getEngine())
 {
     setLookAndFeel (&m_lookAndFeel);
     auto& apvts = p.getAPVTS();
@@ -72,6 +72,33 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         *apvts.getParameter (ParameterIDs::globalIntervalPreset), m_intervalPresetCombo);
     addAndMakeVisible (m_intervalPresetCombo);
 
+    // ── Preset navigation (header strip) ─────────────────────────────────────
+    m_presetNameLabel.setFont (juce::Font (juce::FontOptions{}
+        .withName (juce::Font::getDefaultMonospacedFontName())
+        .withHeight (9.5f)));
+    m_presetNameLabel.setColour (juce::Label::textColourId,
+                                 HalationLookAndFeel::accentAmber().withAlpha (0.85f));
+    m_presetNameLabel.setJustificationType (juce::Justification::centred);
+    m_presetNameLabel.setText (m_processorRef.getPresetManager().getCurrentPresetName(),
+                               juce::dontSendNotification);
+
+    m_presetPrev.onClick = [this]
+    {
+        m_processorRef.getPresetManager().loadPreviousPreset();
+        m_presetNameLabel.setText (m_processorRef.getPresetManager().getCurrentPresetName(),
+                                   juce::dontSendNotification);
+    };
+    m_presetNext.onClick = [this]
+    {
+        m_processorRef.getPresetManager().loadNextPreset();
+        m_presetNameLabel.setText (m_processorRef.getPresetManager().getCurrentPresetName(),
+                                   juce::dontSendNotification);
+    };
+
+    addAndMakeVisible (m_presetPrev);
+    addAndMakeVisible (m_presetNameLabel);
+    addAndMakeVisible (m_presetNext);
+
     // ── Bloom visualizer ─────────────────────────────────────────────────────
     addAndMakeVisible (m_bloomViz);
 
@@ -100,6 +127,19 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     m_chaosAttach   = std::make_unique<juce::SliderParameterAttachment> (
         *apvts.getParameter (ParameterIDs::globalChaos),        m_chaosKnob);
 
+    // Double-click a knob to return it to the parameter default
+    const auto setDefaultReturn = [&apvts] (juce::Slider& slider, const juce::String& paramID)
+    {
+        if (auto* param = apvts.getParameter (paramID))
+            slider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
+    };
+    setDefaultReturn (m_bloomKnob,   ParameterIDs::globalBloomRate);
+    setDefaultReturn (m_staggerKnob, ParameterIDs::globalStagger);
+    setDefaultReturn (m_tiltKnob,    ParameterIDs::globalSpectralTilt);
+    setDefaultReturn (m_dampingKnob, ParameterIDs::globalDamping);
+    setDefaultReturn (m_chaosKnob,   ParameterIDs::globalChaos);
+    setDefaultReturn (m_mixSlider,   ParameterIDs::globalMix);
+
     // ── Mix strip ─────────────────────────────────────────────────────────────
     m_mixLabel.setText ("MIX", juce::dontSendNotification);
     m_mixLabel.setFont (juce::Font (juce::FontOptions{}
@@ -116,7 +156,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     m_mixAttach = std::make_unique<juce::SliderParameterAttachment> (
         *apvts.getParameter (ParameterIDs::globalMix), m_mixSlider);
 
-    // ── Inspector ─────────────────────────────────────────────────────────────
+    // ── Inspector (debug builds only) ─────────────────────────────────────────
+   #if JUCE_DEBUG
     addAndMakeVisible (m_inspectButton);
     m_inspectButton.onClick = [&]
     {
@@ -127,6 +168,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         }
         m_inspector->setVisible (true);
     };
+   #endif
 
     setSize (680, 480);
     setResizable (false, false);
@@ -261,6 +303,11 @@ void PluginEditor::resized()
     m_pathsCountLabel.setBounds (175, 73, 20, 16);
     m_pathsInc       .setBounds (197, 73, 18, 16);
 
+    // ── Preset navigation (header, centred above the visualizer) ─────────────
+    m_presetPrev     .setBounds (300, 24, 20, 20);
+    m_presetNameLabel.setBounds (322, 24, 156, 20);
+    m_presetNext     .setBounds (480, 24, 20, 20);
+
     // ── Interval preset dropdown ──────────────────────────────────────────────
     m_intervalPresetCombo.setBounds (16, 92, 228, 22);
 
@@ -282,14 +329,21 @@ void PluginEditor::resized()
     m_mixLabel .setBounds (16,  450, 36, 16);
     m_mixSlider.setBounds (56,  452, 180, 12);
 
-    // ── Inspector ─────────────────────────────────────────────────────────────
+   #if JUCE_DEBUG
     m_inspectButton.setBounds (getWidth() - 70, getHeight() - 26, 58, 18);
+   #endif
 }
 
 //==============================================================================
 void PluginEditor::timerCallback()
 {
     refreshPathVisibility();
+
+    // Preset name can change behind our back (host program change)
+    const auto presetName = m_processorRef.getPresetManager().getCurrentPresetName();
+    if (m_presetNameLabel.getText() != presetName)
+        m_presetNameLabel.setText (presetName, juce::dontSendNotification);
+
     repaint(); // redraws knob values and bottom strip readouts
 }
 

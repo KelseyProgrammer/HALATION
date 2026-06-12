@@ -5,12 +5,14 @@
 #include <juce_core/juce_core.h>
 #include <juce_dsp/juce_dsp.h>
 #include <array>
+#include <atomic>
 
 namespace halation
 {
 
 // Central DSP orchestrator. The only DSP class PluginProcessor talks to.
 // Owns 8 PathProcessors and manages global parameter distribution.
+// All setters are called from the audio thread (processBlock) only.
 class HalationEngine
 {
 public:
@@ -37,12 +39,24 @@ public:
 
     int getLatencySamples() const;
 
+    // Smoothed per-path output level (post level/pan), safe to read from the
+    // message thread — drives the bloom visualizer.
+    float getPathOutputLevel (int path) const
+    {
+        if (path < 0 || path >= kMaxPaths)
+            return 0.0f;
+        return m_pathLevels[static_cast<size_t> (path)].load (std::memory_order_relaxed);
+    }
+
 private:
     void updateStaggerDelays();
+    void updateChaosOffsets (int numSamples);
 
     std::array<PathProcessor, kMaxPaths> m_paths;
-    std::array<int, kMaxPaths>           m_staggerDelaySamples {};
     std::array<float, kMaxPaths>         m_chaosLfoPhase {};
+
+    // Per-path output meters, written on the audio thread, read by the UI
+    std::array<std::atomic<float>, kMaxPaths> m_pathLevels {};
 
     int   m_numPaths { 4 };
     float m_stagger  { 0.5f };
@@ -52,12 +66,16 @@ private:
     juce::SmoothedValue<float> m_bloomSmoothed;
     juce::SmoothedValue<float> m_mixSmoothed;
 
+    // Dry path delayed by the pitch shifter latency so dry and wet line up
+    // with the latency reported to the host.
+    std::array<float, PitchShifter::kFFTSize> m_dryDelayL {};
+    std::array<float, PitchShifter::kFFTSize> m_dryDelayR {};
+    int m_dryDelayHead { 0 };
+
     // Output safety limiter (-1 dBFS ceiling)
     juce::dsp::Limiter<float> m_limiter;
 
     double m_sampleRate { 44100.0 };
-
-    juce::CriticalSection m_pathCountLock;
 };
 
 } // namespace halation

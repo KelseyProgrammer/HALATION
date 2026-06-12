@@ -20,10 +20,13 @@ void PathProcessor::prepare (double sampleRate, int maxBlockSize)
     m_levelSmoothed.reset    (sampleRate, 0.02);
     m_panLeftSmoothed.reset  (sampleRate, 0.02);
     m_panRightSmoothed.reset (sampleRate, 0.02);
+    m_delaySmoothed.reset    (sampleRate, 0.05);
 
     m_levelSmoothed.setCurrentAndTargetValue    (1.0f);
     m_panLeftSmoothed.setCurrentAndTargetValue  (1.0f);
     m_panRightSmoothed.setCurrentAndTargetValue (1.0f);
+    m_delaySmoothed.setCurrentAndTargetValue (
+        kBaseDelayMs * 0.001f * static_cast<float> (sampleRate));
 
     m_pitchShifterL.prepare (sampleRate, maxBlockSize);
     m_pitchShifterR.prepare (sampleRate, maxBlockSize);
@@ -50,14 +53,11 @@ void PathProcessor::reset()
 }
 
 std::pair<float, float> PathProcessor::process (float inputL, float inputR,
-                                                 float bloomRate,
-                                                 int   staggerDelaySamples)
+                                                 float bloomRate)
 {
-    const int totalDelay = juce::jlimit (1, kMaxDelaySamples - 1,
-                                         PitchShifter::kFFTSize + staggerDelaySamples);
-
-    // Update pitch ratio each sample (chaos offset may change every block)
-    updatePitchRatio();
+    const float delaySamples = juce::jlimit (1.0f,
+                                             static_cast<float> (kMaxDelaySamples - 2),
+                                             m_delaySmoothed.getNextValue());
 
     // Mix input with feedback, then pitch-shift
     const float shiftInL = inputL + m_feedbackL * bloomRate;
@@ -69,14 +69,19 @@ std::pair<float, float> PathProcessor::process (float inputL, float inputR,
     // Write into delay line
     writeDelay (shiftedL, shiftedR);
 
-    // Read delayed output
-    float wetL = readDelay (totalDelay, 0);
-    float wetR = readDelay (totalDelay, 1);
+    // Read delayed output (fractional, linear interpolation)
+    float wetL = readDelayInterpolated (delaySamples, 0);
+    float wetR = readDelayInterpolated (delaySamples, 1);
 
-    // Apply spectral tilt + damping in the feedback tap, then DC-block
+    // Feedback tap: spectral tilt, soft saturation, then DC blocking.
+    // The tanh keeps runaway feedback musically bounded (tape-style
+    // compression as the loop approaches unity gain) instead of leaving
+    // it all to the output limiter.
     float fbL = wetL;
     float fbR = wetR;
     m_spectralTilt.processSample (fbL, fbR);
+    fbL = std::tanh (fbL);
+    fbR = std::tanh (fbR);
     m_feedbackL = dcBlock (fbL, m_dcPrevInL, m_dcPrevOutL);
     m_feedbackR = dcBlock (fbR, m_dcPrevInR, m_dcPrevOutR);
 
@@ -91,13 +96,14 @@ std::pair<float, float> PathProcessor::process (float inputL, float inputR,
 void PathProcessor::setSemitones (float semitones)
 {
     m_baseSemitones = semitones;
-    updatePitchRatio();
+    updatePitchRatios();
 }
 
-void PathProcessor::setChaosOffsetCents (float cents)
+void PathProcessor::setChaosOffsetCents (float centsL, float centsR)
 {
-    m_chaosOffsetCents = cents;
-    // ratio is updated per-sample inside process(), no need to call here
+    m_chaosOffCentsL = centsL;
+    m_chaosOffCentsR = centsR;
+    updatePitchRatios();
 }
 
 void PathProcessor::setLevel (float level)
@@ -123,6 +129,12 @@ void PathProcessor::setDamping (float damping)
     m_spectralTilt.setDamping (damping);
 }
 
+void PathProcessor::setDelaySamples (float delaySamples)
+{
+    m_delaySmoothed.setTargetValue (
+        juce::jlimit (1.0f, static_cast<float> (kMaxDelaySamples - 2), delaySamples));
+}
+
 int PathProcessor::getLatencySamples() const
 {
     return PitchShifter::kFFTSize;
@@ -130,16 +142,23 @@ int PathProcessor::getLatencySamples() const
 
 // Private =====================================================================
 
-float PathProcessor::readDelay (int delaySamples, int channel) const
+float PathProcessor::readDelayInterpolated (float delaySamples, int channel) const
 {
-    int readHead = m_writeHead - delaySamples;
-    if (readHead < 0)
-        readHead += kMaxDelaySamples;
+    const int   whole = static_cast<int> (delaySamples);
+    const float frac  = delaySamples - static_cast<float> (whole);
 
-    if (channel == 0)
-        return m_delayLineL[static_cast<size_t> (readHead)];
-    else
-        return m_delayLineR[static_cast<size_t> (readHead)];
+    int read0 = m_writeHead - whole;
+    if (read0 < 0)
+        read0 += kMaxDelaySamples;
+
+    int read1 = read0 - 1;
+    if (read1 < 0)
+        read1 += kMaxDelaySamples;
+
+    const auto& line = (channel == 0) ? m_delayLineL : m_delayLineR;
+    const float s0 = line[static_cast<size_t> (read0)];
+    const float s1 = line[static_cast<size_t> (read1)];
+    return s0 + frac * (s1 - s0);
 }
 
 void PathProcessor::writeDelay (float sampleL, float sampleR)
@@ -159,12 +178,12 @@ float PathProcessor::dcBlock (float x, float& prevIn, float& prevOut) const noex
     return y;
 }
 
-void PathProcessor::updatePitchRatio()
+void PathProcessor::updatePitchRatios()
 {
-    const float totalSemitones = m_baseSemitones + m_chaosOffsetCents * 0.01f;
-    const float ratio = std::pow (2.0f, totalSemitones / 12.0f);
-    m_pitchShifterL.setPitchRatio (ratio);
-    m_pitchShifterR.setPitchRatio (ratio);
+    m_pitchShifterL.setPitchRatio (
+        std::pow (2.0f, (m_baseSemitones + m_chaosOffCentsL * 0.01f) / 12.0f));
+    m_pitchShifterR.setPitchRatio (
+        std::pow (2.0f, (m_baseSemitones + m_chaosOffCentsR * 0.01f) / 12.0f));
 }
 
 } // namespace halation

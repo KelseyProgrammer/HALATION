@@ -1,7 +1,8 @@
 #include "BloomVisualizer.h"
 
-BloomVisualizer::BloomVisualizer (juce::AudioProcessorValueTreeState& apvts)
-    : m_apvts (apvts)
+BloomVisualizer::BloomVisualizer (juce::AudioProcessorValueTreeState& apvts,
+                                  const halation::HalationEngine& engine)
+    : m_apvts (apvts), m_engine (engine)
 {
     setMouseCursor (juce::MouseCursor::NormalCursor);
     startTimerHz (30);
@@ -169,11 +170,19 @@ void BloomVisualizer::paint (juce::Graphics& g)
     const float halfAngle = juce::MathConstants<float>::pi
                             / static_cast<float> (numPaths) * 0.70f;
 
+    float liveSum = 0.0f;
+
     for (int i = 0; i < numPaths; ++i)
     {
         const float semitones = *m_apvts.getRawParameterValue (ParameterIDs::pathSemitones (i));
         const float level     = *m_apvts.getRawParameterValue (ParameterIDs::pathLevel     (i));
         const auto  colour    = HalationLookAndFeel::pathColour (i);
+
+        // Live output level of this path (audio-thread meter), perceptually
+        // scaled — drives glow so the bloom breathes with the actual sound
+        const float live = juce::jlimit (0.0f, 1.0f,
+                                         std::sqrt (m_engine.getPathOutputLevel (i)) * 1.5f);
+        liveSum += live;
 
         // Angle: evenly spaced, starting from top
         const float angle = -juce::MathConstants<float>::halfPi
@@ -206,7 +215,8 @@ void BloomVisualizer::paint (juce::Graphics& g)
         wedge.closeSubPath();
 
         const float fillAlpha = juce::jlimit (0.0f, 1.0f,
-                                              0.22f + level * 0.18f + bloomRate * 0.12f);
+                                              0.18f + level * 0.14f + bloomRate * 0.10f
+                                              + live * 0.30f);
         g.setColour (colour.withAlpha (fillAlpha));
         g.fillPath (wedge);
 
@@ -231,13 +241,15 @@ void BloomVisualizer::paint (juce::Graphics& g)
         const float tipX    = cx + std::cos (angle) * armLen;
         const float tipY    = cy + std::sin (angle) * armLen;
         const bool  active  = (i == m_draggingPath || i == m_hoveredPath);
-        const float dotR    = active ? 10.0f : (4.0f + level * 3.0f + bloomRate * 2.0f);
+        const float dotR    = active ? 10.0f
+                                     : (4.0f + level * 2.0f + bloomRate * 1.5f + live * 4.0f);
 
-        // Outer glow ring when active
-        if (active)
+        // Outer glow ring when active or when the path is sounding
+        if (active || live > 0.05f)
         {
-            g.setColour (colour.withAlpha (0.35f));
-            g.fillEllipse (tipX - dotR, tipY - dotR, dotR * 2.0f, dotR * 2.0f);
+            const float glowR = active ? dotR : dotR * (1.0f + live);
+            g.setColour (colour.withAlpha (active ? 0.35f : live * 0.30f));
+            g.fillEllipse (tipX - glowR, tipY - glowR, glowR * 2.0f, glowR * 2.0f);
         }
 
         g.setColour (colour.withAlpha (active ? 1.0f : 0.85f));
@@ -257,9 +269,11 @@ void BloomVisualizer::paint (juce::Graphics& g)
                     juce::Justification::centred, false);
     }
 
-    // Center amber core — glows with bloom
-    const float coreR = 6.0f + bloomRate * 6.0f;
-    g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.20f + bloomRate * 0.25f));
+    // Center amber core — glows with bloom rate and pulses with the live output
+    const float liveAvg = liveSum / static_cast<float> (numPaths);
+    const float coreR   = 6.0f + bloomRate * 5.0f + liveAvg * 6.0f;
+    g.setColour (HalationLookAndFeel::accentAmber().withAlpha (
+        juce::jlimit (0.0f, 1.0f, 0.20f + bloomRate * 0.20f + liveAvg * 0.30f)));
     g.fillEllipse (cx - coreR, cy - coreR, coreR * 2.0f, coreR * 2.0f);
 
     g.setColour (HalationLookAndFeel::accentAmber().withAlpha (0.90f));

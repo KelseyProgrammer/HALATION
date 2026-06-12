@@ -27,6 +27,12 @@ PathRowComponent::PathRowComponent (int pathIndex, juce::AudioProcessorValueTree
     m_panAttach = std::make_unique<juce::SliderParameterAttachment> (
         *apvts.getParameter (ParameterIDs::pathPan (pathIndex)), m_panSlider);
 
+    // Double-click returns level/pan to the parameter default
+    if (auto* param = apvts.getParameter (ParameterIDs::pathLevel (pathIndex)))
+        m_levelSlider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
+    if (auto* param = apvts.getParameter (ParameterIDs::pathPan (pathIndex)))
+        m_panSlider.setDoubleClickReturnValue (true, param->convertFrom0to1 (param->getDefaultValue()));
+
     apvts.addParameterListener (ParameterIDs::pathSemitones (pathIndex), this);
 
     const float initSemi = *apvts.getRawParameterValue (ParameterIDs::pathSemitones (pathIndex));

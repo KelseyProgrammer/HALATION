@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HalationEngine.h"
 #include "HalationLookAndFeel.h"
 #include "IntervalPresets.h"
 #include "ParameterIDs.h"
@@ -8,12 +9,14 @@
 
 // Radial bloom visualizer: one arm per active path, repaints at 30fps.
 // Arm angle encodes path index, arm length encodes interval magnitude.
+// Arm glow and tip dots pulse with the live output level of each path.
 // Tip dots are draggable — dragging inward/outward changes path semitones.
 class BloomVisualizer : public juce::Component,
                         private juce::Timer
 {
 public:
-    explicit BloomVisualizer (juce::AudioProcessorValueTreeState& apvts);
+    BloomVisualizer (juce::AudioProcessorValueTreeState& apvts,
+                     const halation::HalationEngine& engine);
     ~BloomVisualizer() override;
 
     void paint      (juce::Graphics&) override;
@@ -37,6 +40,7 @@ private:
     int      hitTestTip (juce::Point<float> p) const;
 
     juce::AudioProcessorValueTreeState& m_apvts;
+    const halation::HalationEngine&     m_engine;
 
     int   m_draggingPath  = -1;   // path index being dragged, -1 = none
     int   m_hoveredPath   = -1;   // path index mouse is hovering over, -1 = none
