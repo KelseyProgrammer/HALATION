@@ -21,9 +21,24 @@ public:
 private:
     void timerCallback() override;
     void refreshPathVisibility();
+    void paintCanvas (juce::Graphics&);
+
+    // Fixed design-space size — the canvas is laid out at this size and scaled
+    // to fit the window, so all child bounds stay in design coordinates.
+    static constexpr int kDesignW = 680;
+    static constexpr int kDesignH = 480;
 
     PluginProcessor&    m_processorRef;
     HalationLookAndFeel m_lookAndFeel;
+
+    // ── Scalable canvas — all widgets live on this, not on the editor ────────
+    struct Canvas : juce::Component
+    {
+        explicit Canvas (PluginEditor& e) : m_editor (e) {}
+        void paint (juce::Graphics& g) override { m_editor.paintCanvas (g); }
+        PluginEditor& m_editor;
+    };
+    Canvas m_canvas { *this };
 
     // ── Path matrix ──────────────────────────────────────────────────────────
     std::array<std::unique_ptr<PathRowComponent>, 8> m_pathRows;

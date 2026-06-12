@@ -242,7 +242,7 @@ Layout is three-column: path matrix left (240px), bloom visualizer center (flex)
 - Inactive path rows are hidden entirely — matrix shrinks
 - Semitone displays show musical interval names (P5, Oct↑, m3, etc.) from a lookup table
 - Preset dropdown snaps to "Custom" when any interval is touched manually
-- Plugin window size: **680 × 480px**, non-resizable for v1.0
+- Plugin window: **680 × 480px** design canvas, resizable 0.5×–2× with locked aspect ratio — the whole UI scales via an affine transform on a fixed-size canvas component; last scale persists in plugin state as `editor_scale`
 
 ### JUCE Component Approach
 - Use custom `LookAndFeel` subclass (`HalationLookAndFeel`) for all knob/slider rendering — do not mix stock JUCE look

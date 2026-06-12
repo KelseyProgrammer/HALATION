@@ -23,12 +23,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     setLookAndFeel (&m_lookAndFeel);
     auto& apvts = p.getAPVTS();
 
+    addAndMakeVisible (m_canvas);
+
     // ── Path rows ─────────────────────────────────────────────────────────────
     for (int i = 0; i < 8; ++i)
     {
         m_pathRows[static_cast<size_t> (i)] =
             std::make_unique<PathRowComponent> (i, apvts);
-        addAndMakeVisible (*m_pathRows[static_cast<size_t> (i)]);
+        m_canvas.addAndMakeVisible (*m_pathRows[static_cast<size_t> (i)]);
     }
 
     // ── Paths +/- ─────────────────────────────────────────────────────────────
@@ -57,9 +59,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         }
     };
 
-    addAndMakeVisible (m_pathsDec);
-    addAndMakeVisible (m_pathsCountLabel);
-    addAndMakeVisible (m_pathsInc);
+    m_canvas.addAndMakeVisible (m_pathsDec);
+    m_canvas.addAndMakeVisible (m_pathsCountLabel);
+    m_canvas.addAndMakeVisible (m_pathsInc);
 
     // ── Interval preset dropdown ──────────────────────────────────────────────
     m_intervalPresetCombo.addItem ("Unison",          1);
@@ -70,7 +72,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     m_intervalPresetCombo.addItem ("Custom",           6);
     m_intervalPresetAttach = std::make_unique<juce::ComboBoxParameterAttachment> (
         *apvts.getParameter (ParameterIDs::globalIntervalPreset), m_intervalPresetCombo);
-    addAndMakeVisible (m_intervalPresetCombo);
+    m_canvas.addAndMakeVisible (m_intervalPresetCombo);
 
     // ── Preset navigation (header strip) ─────────────────────────────────────
     m_presetNameLabel.setFont (juce::Font (juce::FontOptions{}
@@ -95,12 +97,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
                                    juce::dontSendNotification);
     };
 
-    addAndMakeVisible (m_presetPrev);
-    addAndMakeVisible (m_presetNameLabel);
-    addAndMakeVisible (m_presetNext);
+    m_canvas.addAndMakeVisible (m_presetPrev);
+    m_canvas.addAndMakeVisible (m_presetNameLabel);
+    m_canvas.addAndMakeVisible (m_presetNext);
 
     // ── Bloom visualizer ─────────────────────────────────────────────────────
-    addAndMakeVisible (m_bloomViz);
+    m_canvas.addAndMakeVisible (m_bloomViz);
 
     // ── Global knobs — each with its own path color ───────────────────────────
     struct KnobSetup { juce::Slider* knob; int colorIndex; };
@@ -113,7 +115,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         const auto c = HalationLookAndFeel::pathColour (ci);
         knob->setColour (juce::Slider::rotarySliderFillColourId, c);
         knob->setColour (juce::Slider::thumbColourId,            c);
-        addAndMakeVisible (knob);
+        m_canvas.addAndMakeVisible (knob);
     }
 
     m_bloomAttach   = std::make_unique<juce::SliderParameterAttachment> (
@@ -147,18 +149,18 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         .withHeight (8.0f)));
     m_mixLabel.setColour (juce::Label::textColourId, HalationLookAndFeel::mutedLabel());
     m_mixLabel.setJustificationType (juce::Justification::centredLeft);
-    addAndMakeVisible (m_mixLabel);
+    m_canvas.addAndMakeVisible (m_mixLabel);
 
     m_mixSlider.setColour (juce::Slider::trackColourId,      HalationLookAndFeel::accentAmber().withAlpha (0.7f));
     m_mixSlider.setColour (juce::Slider::backgroundColourId, HalationLookAndFeel::mutedLabel().withAlpha (0.3f));
     m_mixSlider.setColour (juce::Slider::thumbColourId,      HalationLookAndFeel::accentAmber());
-    addAndMakeVisible (m_mixSlider);
+    m_canvas.addAndMakeVisible (m_mixSlider);
     m_mixAttach = std::make_unique<juce::SliderParameterAttachment> (
         *apvts.getParameter (ParameterIDs::globalMix), m_mixSlider);
 
     // ── Inspector (debug builds only) ─────────────────────────────────────────
    #if JUCE_DEBUG
-    addAndMakeVisible (m_inspectButton);
+    m_canvas.addAndMakeVisible (m_inspectButton);
     m_inspectButton.onClick = [&]
     {
         if (! m_inspector)
@@ -170,8 +172,16 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     };
    #endif
 
-    setSize (680, 480);
-    setResizable (false, false);
+    setResizable (true, true);
+    setResizeLimits (kDesignW / 2, kDesignH / 2, kDesignW * 2, kDesignH * 2);
+    getConstrainer()->setFixedAspectRatio (static_cast<double> (kDesignW)
+                                           / static_cast<double> (kDesignH));
+
+    // Restore the last window scale (persisted in the plugin state)
+    const float scale = juce::jlimit (0.5f, 2.0f,
+        static_cast<float> (apvts.state.getProperty ("editor_scale", 1.0f)));
+    setSize (juce::roundToInt (kDesignW * scale), juce::roundToInt (kDesignH * scale));
+
     startTimerHz (10);
 }
 
@@ -183,6 +193,12 @@ PluginEditor::~PluginEditor()
 
 //==============================================================================
 void PluginEditor::paint (juce::Graphics& g)
+{
+    // The canvas covers the editor; this only shows through during resize rounding.
+    g.fillAll (HalationLookAndFeel::background());
+}
+
+void PluginEditor::paintCanvas (juce::Graphics& g)
 {
     g.fillAll (HalationLookAndFeel::background());
 
@@ -206,9 +222,9 @@ void PluginEditor::paint (juce::Graphics& g)
 
     g.setColour (HalationLookAndFeel::mutedLabel());
     g.setFont (monoFont (8.0f));
-    g.drawText ("AMENT AUDIO",        getWidth() - 120, 16, 108, 12,
+    g.drawText ("AMENT AUDIO",        kDesignW - 120, 16, 108, 12,
                 juce::Justification::centredRight, false);
-    g.drawText ("v" + juce::String (VERSION), getWidth() - 120, 30, 108, 12,
+    g.drawText ("v" + juce::String (VERSION), kDesignW - 120, 30, 108, 12,
                 juce::Justification::centredRight, false);
 
     // ── Panel borders ─────────────────────────────────────────────────────────
@@ -298,6 +314,17 @@ void PluginEditor::paint (juce::Graphics& g)
 //==============================================================================
 void PluginEditor::resized()
 {
+    // Scale the fixed-size canvas to fill the window (aspect ratio is locked
+    // by the constrainer, so width and height give the same factor)
+    const float scale = static_cast<float> (getWidth()) / static_cast<float> (kDesignW);
+    m_canvas.setTransform (juce::AffineTransform::scale (scale));
+    m_canvas.setBounds (0, 0, kDesignW, kDesignH);
+
+    // Remember the window scale across editor open/close
+    m_processorRef.getAPVTS().state.setProperty ("editor_scale", scale, nullptr);
+
+    // All child bounds below are in 680x480 design coordinates.
+
     // ── Paths +/- (top-right of left panel) ──────────────────────────────────
     m_pathsDec       .setBounds (155, 73, 18, 16);
     m_pathsCountLabel.setBounds (175, 73, 20, 16);
@@ -330,7 +357,7 @@ void PluginEditor::resized()
     m_mixSlider.setBounds (56,  452, 180, 12);
 
    #if JUCE_DEBUG
-    m_inspectButton.setBounds (getWidth() - 70, getHeight() - 26, 58, 18);
+    m_inspectButton.setBounds (kDesignW - 70, kDesignH - 26, 58, 18);
    #endif
 }
 
